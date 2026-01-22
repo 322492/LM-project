@@ -19,5 +19,17 @@ Poniżej znajdują się wyłącznie decyzje już podjęte:
 
 ---
 
+## Status danych (sanity check)
+- Źródło: **OPUS – Bible-uedin** (korpus równoległy EN–PL).
+- Format:
+  - **Moses**: `data/raw/bible-uedin.en-pl.en` + `data/raw/bible-uedin.en-pl.pl` (1 linia = 1 para),
+  - **XML**: `data/raw/bible-uedin.en-pl.xml` (metadane).
+- Liczba par zdań (Moses): **60821**.
+- Wyniki sanity check:
+  - brak pustych segmentów (EN: 0, PL: 0),
+  - długości zdań są stabilne (mediana: EN 23 słowa, PL 18 słów),
+  - niewielka liczba outlierów długościowych (np. 13 bardzo długich linii po stronie EN).
+- Konkluzja: dane są spójne i nadają się do dalszej pracy.
+
 ## TODO (checklista)
 Szczegółowa checklista projektu jest w pliku: **[`TODO.md`](TODO.md)**.

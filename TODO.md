@@ -14,11 +14,13 @@ Poniższa lista jest podzielona na etapy. Elementy, których nie da się ustali�
   - [ ] Pomiary: czas/epoka, maks. batch/seq length, zużycie VRAM/RAM
 
 ## Dane
-- [ ] Pozyskać pary równoległe **EN–PL dla Biblii** (źródło + format plików).
+- [x] Pozyskać pary równoległe **EN–PL dla Biblii** (OPUS: Bible-uedin; format Moses + XML).
 - [ ] Sprawdzić licencję/warunki użycia danych i zanotować je w repo.
+- [x] Wykonać sanity check korpusu równoległego (Moses .en/.pl: spójność linii, puste segmenty, statystyki długości, losowe próbki) — wynik: **60821** par, puste segmenty: 0, pojedyncze outliery długościowe.
 - [ ] Ustalić schemat podziału danych biblijnych:
   - [ ] train/valid/test (np. na poziomie wersetów/rozdziałów/ksiąg – do decyzji)
   - [ ] zasady, aby nie mieszać bardzo podobnych fragmentów między splitami
+- [ ] Wykorzystać `data/raw/bible-uedin.en-pl.xml` do przygotowania splitów train/val/test w sposób zapobiegający przeciekowi (np. split po księgach) — **konkretna decyzja o podziale nie jest jeszcze podjęta**.
 - [ ] Oczyścić dane:
   - [ ] normalizacja znaków, usunięcie pustych linii, spójne kodowanie
   - [ ] wykrycie duplikatów i ew. usunięcie

@@ -31,5 +31,11 @@ Poniżej znajdują się wyłącznie decyzje już podjęte:
   - niewielka liczba outlierów długościowych (np. 13 bardzo długich linii po stronie EN).
 - Konkluzja: dane są spójne i nadają się do dalszej pracy.
 
+## Splity danych
+- Używamy **losowego splitu 80/5/15 po wersetach (liniach)**, bez deduplikacji i bez filtrowania długości.
+- Split jest deterministyczny: **seed=2137**. Pliki wyjściowe: `data/splits_random/{train,val,test}.{en,pl}`.
+- Sprawdzenie duplikatów (exact match) pokazało, że duplikaty par (EN,PL) to ok. **0.73%** — ryzyko przecieku przez identyczne pary jest niskie.
+- Dlatego wybrano prosty losowy split (zgodny z praktyką z ćwiczeń) jako punkt startowy do dalszych eksperymentów.
+
 ## TODO (checklista)
 Szczegółowa checklista projektu jest w pliku: **[`TODO.md`](TODO.md)**.

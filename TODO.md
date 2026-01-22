@@ -20,7 +20,8 @@ Poniższa lista jest podzielona na etapy. Elementy, których nie da się ustali�
 - [ ] Ustalić schemat podziału danych biblijnych:
   - [ ] train/valid/test (np. na poziomie wersetów/rozdziałów/ksiąg – do decyzji)
   - [ ] zasady, aby nie mieszać bardzo podobnych fragmentów między splitami
-- [ ] Wykorzystać `data/raw/bible-uedin.en-pl.xml` do przygotowania splitów train/val/test w sposób zapobiegający przeciekowi (np. split po księgach) — **konkretna decyzja o podziale nie jest jeszcze podjęta**.
+- [x] Przygotować splity train/val/test (wariant losowy po wersetach/liniiach): **80/5/15**, deterministycznie (**seed=2137**), zapis do `data/splits_random/`.
+- [ ] (PORZUCONE) Wykorzystać `data/raw/bible-uedin.en-pl.xml` do splitów po księgach (wariant porzucony na rzecz prostego losowego splitu po wersetach).
 - [ ] Oczyścić dane:
   - [ ] normalizacja znaków, usunięcie pustych linii, spójne kodowanie
   - [ ] wykrycie duplikatów i ew. usunięcie

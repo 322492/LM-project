@@ -277,7 +277,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Ścieżka do pliku PL (.pl). Jeśli nie podasz, skrypt spróbuje wykryć plik w --raw-dir.",
     )
     p.add_argument("--samples", type=int, default=8, help="Ile par wypisać do ręcznej kontroli (domyślnie: 8).")
-    p.add_argument("--seed", type=int, default=123, help="Ziarno losowania przykładów (domyślnie: 123).")
+    p.add_argument("--seed", type=int, default=2137, help="Ziarno losowania przykładów (domyślnie: 2137).")
     p.add_argument(
         "--short-words",
         type=int,

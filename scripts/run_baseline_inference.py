@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """
+UWAGA: CAŁOŚĆ TRWA KILKA GODZIN!
+
 Baseline inference EN->PL na CPU z uzyciem modelu multilingual:
   facebook/nllb-200-distilled-600M
 
@@ -46,6 +48,7 @@ def batch_translate(
     output_max_length: int,
     src_lang: str,
     tgt_lang: str,
+    log_every: int = 0,
 ) -> List[str]:
     """
     Tlumaczenie w batchach. Zachowuje liczbe linii (puste wejscia -> puste wyjscia).
@@ -70,6 +73,7 @@ def batch_translate(
     if forced_bos_token_id is None or forced_bos_token_id == tokenizer.unk_token_id:
         raise ValueError(f"Nie udalo sie wyznaczyc forced_bos_token_id dla tgt_lang={tgt_lang!r}.")
 
+    start_t = time.perf_counter()
     with torch.no_grad():
         for start in range(0, len(texts), batch_size):
             batch = list(texts[start : start + batch_size])
@@ -105,6 +109,17 @@ def batch_translate(
                 batch_out[pos] = hyp
             out.extend(batch_out)
 
+            if log_every and (len(out) % log_every == 0 or len(out) == len(texts)):
+                elapsed = time.perf_counter() - start_t
+                speed = (len(out) / elapsed) if elapsed > 0 else 0.0
+                remaining = len(texts) - len(out)
+                eta = (remaining / speed) if speed > 0 else float("inf")
+                eta_s = f"{eta:.0f}s" if eta != float("inf") else "inf"
+                print(
+                    f"[progress] {len(out)}/{len(texts)} sentences | {speed:.2f} sent/s | elapsed {elapsed:.0f}s | ETA {eta_s}",
+                    flush=True,
+                )
+
     return out
 
 
@@ -129,6 +144,12 @@ def main() -> int:
         default=None,
         help="Max dlugosc wyjscia w tokenach (generate). (nadpisuje config)",
     )
+    ap.add_argument(
+        "--log-every",
+        type=int,
+        default=None,
+        help="Co ile zdan wypisac log postepu (0 = wylacz). (nadpisuje config)",
+    )
     args = ap.parse_args()
 
     cfg = load_toml(Path(args.config))
@@ -143,6 +164,7 @@ def main() -> int:
     batch_size = int(pick(args.batch_size, get_nested(cfg, ["baseline_nllb", "batch_size"]), 4))
     input_max_length = int(pick(args.input_max_length, get_nested(cfg, ["baseline_nllb", "input_max_length"]), 256))
     max_length = int(pick(args.max_length, get_nested(cfg, ["baseline_nllb", "max_length"]), 128))
+    log_every = int(pick(args.log_every, get_nested(cfg, ["baseline_nllb", "log_every"]), 64))
 
     device = torch.device("cpu")
 
@@ -154,8 +176,6 @@ def main() -> int:
         print(f"Model: {model_name}")
         print(f"Szczegoly: {type(e).__name__}: {e}")
         print()
-        print("Wskazowka: jesli masz blokade sieci/proxy na huggingface.co, pobieranie modeli moze nie dzialac.")
-        print("Upewnij sie tez, ze masz zainstalowane: torch + transformers + sentencepiece.")
         return 2
 
     src = read_lines(input_path)
@@ -169,6 +189,7 @@ def main() -> int:
         output_max_length=max_length,
         src_lang=src_lang,
         tgt_lang=tgt_lang,
+        log_every=log_every,
     )
     t1 = time.perf_counter()
     write_lines(output_path, hyps)

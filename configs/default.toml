@@ -49,3 +49,4 @@ tgt_lang = "pol_Latn"
 batch_size = 4
 input_max_length = 256
 max_length = 128
+log_every = 64

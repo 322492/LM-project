@@ -37,5 +37,10 @@ Poniżej znajdują się wyłącznie decyzje już podjęte:
 - Sprawdzenie duplikatów (exact match) pokazało, że duplikaty par (EN,PL) to ok. **0.73%** — ryzyko przecieku przez identyczne pary jest niskie.
 - Dlatego wybrano prosty losowy split (zgodny z praktyką z ćwiczeń) jako punkt startowy do dalszych eksperymentów.
 
+## Konfiguracja (config)
+- Centralny plik ustawień: `configs/default.toml` (ścieżki, seedy, parametry skryptów).
+- Skrypty wspierają flagę `--config` oraz zasadę: **CLI nadpisuje wartości z configa**.
+- Wspólny helper do wczytywania configa: `scripts/config_utils.py`.
+
 ## TODO (checklista)
 Szczegółowa checklista projektu jest w pliku: **[`TODO.md`](TODO.md)**.

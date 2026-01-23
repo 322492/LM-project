@@ -19,6 +19,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import DefaultDict, Dict, Iterable, List, Sequence, Tuple
 
+from config_utils import get_nested, load_toml, pick
+
 
 @dataclass(frozen=True)
 class DupSummary:
@@ -98,25 +100,35 @@ def _short_lines_stats(items: Sequence[str], max_words: int) -> Tuple[int, Dict[
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Sprawdzenie duplikatow w korpusie Moses EN-PL.")
-    ap.add_argument("--en", type=Path, default=Path("data/raw/bible-uedin.en-pl.en"), help="Plik EN (.en).")
-    ap.add_argument("--pl", type=Path, default=Path("data/raw/bible-uedin.en-pl.pl"), help="Plik PL (.pl).")
-    ap.add_argument("--examples", type=int, default=8, help="Ile przykladow duplikatow wypisac (domyslnie: 8).")
+    ap.add_argument("--config", type=Path, default=Path("configs/default.toml"), help="Plik config TOML.")
+    ap.add_argument("--en", type=Path, default=None, help="Plik EN (.en). (nadpisuje config)")
+    ap.add_argument("--pl", type=Path, default=None, help="Plik PL (.pl). (nadpisuje config)")
+    ap.add_argument("--examples", type=int, default=None, help="Ile przykladow duplikatow wypisac. (nadpisuje config)")
     ap.add_argument(
         "--indices-per-example",
         type=int,
-        default=6,
-        help="Maks. liczba indeksow pokazana dla jednego duplikatu (domyslnie: 6).",
+        default=None,
+        help="Maks. liczba indeksow pokazana dla jednego duplikatu. (nadpisuje config)",
     )
     ap.add_argument(
         "--short-max-words",
         type=int,
-        default=2,
-        help="Prog 'bardzo krotkie wersety' (<= N slow). Ustaw 0, zeby pominac (domyslnie: 2).",
+        default=None,
+        help="Prog 'bardzo krotkie wersety' (<= N slow). Ustaw 0, zeby pominac. (nadpisuje config)",
     )
     args = ap.parse_args()
 
-    en_lines = _read_lines(args.en)
-    pl_lines = _read_lines(args.pl)
+    cfg = load_toml(Path(args.config))
+
+    en_path = Path(pick(args.en, get_nested(cfg, ["paths", "raw_en"]), "data/raw/bible-uedin.en-pl.en"))
+    pl_path = Path(pick(args.pl, get_nested(cfg, ["paths", "raw_pl"]), "data/raw/bible-uedin.en-pl.pl"))
+
+    examples = int(pick(args.examples, get_nested(cfg, ["duplicates_check", "examples"]), 8))
+    indices_per_example = int(pick(args.indices_per_example, get_nested(cfg, ["duplicates_check", "indices_per_example"]), 6))
+    short_max_words = int(pick(args.short_max_words, get_nested(cfg, ["duplicates_check", "short_max_words"]), 2))
+
+    en_lines = _read_lines(en_path)
+    pl_lines = _read_lines(pl_path)
 
     if len(en_lines) != len(pl_lines):
         print(f"BLAD: rozna liczba linii: EN={len(en_lines)}, PL={len(pl_lines)}")
@@ -125,8 +137,8 @@ def main() -> int:
     pairs = list(zip(en_lines, pl_lines))
 
     print("=== DUPLICATES CHECK: korpus rownolegly EN-PL (Moses) ===")
-    print(f"EN: {args.en}")
-    print(f"PL: {args.pl}")
+    print(f"EN: {en_path}")
+    print(f"PL: {pl_path}")
     print(f"Liczba par (linii): {len(pairs)}")
     print()
 
@@ -142,8 +154,8 @@ def main() -> int:
     print()
 
     # Przyklady
-    k = int(args.examples)
-    m = int(args.indices_per_example)
+    k = examples
+    m = indices_per_example
 
     print("== Przyklady duplikatow (EN) ==")
     for text, idx_list in _collect_duplicate_examples(en_lines, max_examples=k, max_indices_per_example=m):
@@ -176,7 +188,7 @@ def main() -> int:
     print()
 
     # Opcjonalnie: bardzo krotkie wersety
-    short_n = int(args.short_max_words)
+    short_n = short_max_words
     if short_n > 0:
         en_short_count, en_short_counter = _short_lines_stats(en_lines, max_words=short_n)
         pl_short_count, pl_short_counter = _short_lines_stats(pl_lines, max_words=short_n)

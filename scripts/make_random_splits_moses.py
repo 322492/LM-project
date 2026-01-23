@@ -15,6 +15,8 @@ import random
 from pathlib import Path
 from typing import List, Sequence, Tuple
 
+from config_utils import get_nested, load_toml, pick
+
 
 def read_lines(path: Path) -> List[str]:
     with path.open("r", encoding="utf-8", errors="replace") as f:
@@ -75,18 +77,36 @@ def sample_indices(indices: Sequence[int], k: int, seed: int) -> List[int]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Losowy split 80/5/15 (po liniach) dla Moses EN-PL.")
-    ap.add_argument("--en", type=Path, default=Path("data/raw/bible-uedin.en-pl.en"), help="Plik EN (.en).")
-    ap.add_argument("--pl", type=Path, default=Path("data/raw/bible-uedin.en-pl.pl"), help="Plik PL (.pl).")
-    ap.add_argument("--out-dir", type=Path, default=Path("data/splits_random"), help="Katalog wyjsciowy.")
-    ap.add_argument("--seed", type=int, default=2137, help="Seed losowosci (domyslnie: 2137).")
-    ap.add_argument("--train", type=float, default=0.80, help="Udzial TRAIN (domyslnie: 0.80).")
-    ap.add_argument("--val", type=float, default=0.05, help="Udzial VAL (domyslnie: 0.05).")
-    ap.add_argument("--test", type=float, default=0.15, help="Udzial TEST (domyslnie: 0.15).")
-    ap.add_argument("--show-indices", type=int, default=5, help="Ile przykladowych indeksow pokazac na split (domyslnie: 5).")
+    ap.add_argument("--config", type=Path, default=Path("configs/default.toml"), help="Plik config TOML.")
+    ap.add_argument("--en", type=Path, default=None, help="Plik EN (.en). (nadpisuje config)")
+    ap.add_argument("--pl", type=Path, default=None, help="Plik PL (.pl). (nadpisuje config)")
+    ap.add_argument("--out-dir", type=Path, default=None, help="Katalog wyjsciowy. (nadpisuje config)")
+    ap.add_argument("--seed", type=int, default=None, help="Seed losowosci. (nadpisuje config)")
+    ap.add_argument("--train", type=float, default=None, help="Udzial TRAIN. (nadpisuje config)")
+    ap.add_argument("--val", type=float, default=None, help="Udzial VAL. (nadpisuje config)")
+    ap.add_argument("--test", type=float, default=None, help="Udzial TEST. (nadpisuje config)")
+    ap.add_argument("--show-indices", type=int, default=None, help="Ile przykladowych indeksow pokazac na split. (nadpisuje config)")
     args = ap.parse_args()
 
-    en_lines = read_lines(args.en)
-    pl_lines = read_lines(args.pl)
+    cfg = load_toml(Path(args.config))
+
+    en_path = Path(
+        pick(args.en, get_nested(cfg, ["paths", "raw_en"]), "data/raw/bible-uedin.en-pl.en")
+    )
+    pl_path = Path(
+        pick(args.pl, get_nested(cfg, ["paths", "raw_pl"]), "data/raw/bible-uedin.en-pl.pl")
+    )
+    out_dir = Path(
+        pick(args.out_dir, get_nested(cfg, ["paths", "splits_random_dir"]), "data/splits_random")
+    )
+    seed = int(pick(args.seed, get_nested(cfg, ["random_split", "seed"]), 123))
+    train_ratio = float(pick(args.train, get_nested(cfg, ["random_split", "train_ratio"]), 0.80))
+    val_ratio = float(pick(args.val, get_nested(cfg, ["random_split", "val_ratio"]), 0.05))
+    test_ratio = float(pick(args.test, get_nested(cfg, ["random_split", "test_ratio"]), 0.15))
+    show_indices = int(pick(args.show_indices, get_nested(cfg, ["random_split", "show_indices"]), 5))
+
+    en_lines = read_lines(en_path)
+    pl_lines = read_lines(pl_path)
 
     if len(en_lines) != len(pl_lines):
         print(f"ERROR: rozna liczba linii EN i PL: EN={len(en_lines)} PL={len(pl_lines)}")
@@ -98,31 +118,31 @@ def main() -> int:
 
     train_idx, val_idx, test_idx = split_indices(
         n=total,
-        seed=int(args.seed),
-        train_ratio=float(args.train),
-        val_ratio=float(args.val),
-        test_ratio=float(args.test),
+        seed=seed,
+        train_ratio=train_ratio,
+        val_ratio=val_ratio,
+        test_ratio=test_ratio,
     )
 
-    args.out_dir.mkdir(parents=True, exist_ok=True)
-    write_split(args.out_dir / "train.en", args.out_dir / "train.pl", en_lines, pl_lines, train_idx)
-    write_split(args.out_dir / "val.en", args.out_dir / "val.pl", en_lines, pl_lines, val_idx)
-    write_split(args.out_dir / "test.en", args.out_dir / "test.pl", en_lines, pl_lines, test_idx)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    write_split(out_dir / "train.en", out_dir / "train.pl", en_lines, pl_lines, train_idx)
+    write_split(out_dir / "val.en", out_dir / "val.pl", en_lines, pl_lines, val_idx)
+    write_split(out_dir / "test.en", out_dir / "test.pl", en_lines, pl_lines, test_idx)
 
     print("=== RANDOM SPLIT: Moses EN-PL (line-level) ===")
-    print(f"EN: {args.en}")
-    print(f"PL: {args.pl}")
-    print(f"Output dir: {args.out_dir}")
-    print(f"Seed: {int(args.seed)}")
+    print(f"EN: {en_path}")
+    print(f"PL: {pl_path}")
+    print(f"Output dir: {out_dir}")
+    print(f"Seed: {seed}")
     print()
     print(f"TRAIN: {len(train_idx)} ({pct(len(train_idx), total):.2f}%)")
     print(f"VAL:   {len(val_idx)} ({pct(len(val_idx), total):.2f}%)")
     print(f"TEST:  {len(test_idx)} ({pct(len(test_idx), total):.2f}%)")
     print()
     print("Sample indices (0-based):")
-    print(f"- train: {sample_indices(train_idx, k=int(args.show_indices), seed=int(args.seed) + 1)}")
-    print(f"- val:   {sample_indices(val_idx, k=int(args.show_indices), seed=int(args.seed) + 2)}")
-    print(f"- test:  {sample_indices(test_idx, k=int(args.show_indices), seed=int(args.seed) + 3)}")
+    print(f"- train: {sample_indices(train_idx, k=show_indices, seed=seed + 1)}")
+    print(f"- val:   {sample_indices(val_idx, k=show_indices, seed=seed + 2)}")
+    print(f"- test:  {sample_indices(test_idx, k=show_indices, seed=seed + 3)}")
 
     return 0
 

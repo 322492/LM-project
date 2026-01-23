@@ -22,6 +22,8 @@ from typing import List, Sequence
 import torch
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
+from config_utils import get_nested, load_toml, pick
+
 
 def read_lines(path: Path) -> List[str]:
     with path.open("r", encoding="utf-8", errors="replace") as f:
@@ -107,62 +109,76 @@ def batch_translate(
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Baseline inference EN->PL (CPU) dla facebook/nllb-200-distilled-600M.")
-    ap.add_argument("--model", type=str, default="facebook/nllb-200-distilled-600M", help="Nazwa modelu Hugging Face.")
-    ap.add_argument("--src-lang", type=str, default="eng_Latn", help="Kod jezyka zrodlowego (NLLB), domyslnie: eng_Latn.")
-    ap.add_argument("--tgt-lang", type=str, default="pol_Latn", help="Kod jezyka docelowego (NLLB), domyslnie: pol_Latn.")
-    ap.add_argument("--input", type=Path, default=Path("data/splits_random/test.en"), help="Plik wejsciowy EN.")
-    ap.add_argument("--output", type=Path, default=Path("outputs/baseline/test.hyp.pl"), help="Plik wyjsciowy PL (hyp).")
-    ap.add_argument("--batch-size", type=int, default=4, help="Batch size (domyslnie: 4).")
+    ap = argparse.ArgumentParser(description="Baseline inference EN->PL (CPU) dla NLLB.")
+    ap.add_argument("--config", type=Path, default=Path("configs/default.toml"), help="Plik config TOML.")
+    ap.add_argument("--model", type=str, default=None, help="Nazwa modelu Hugging Face. (nadpisuje config)")
+    ap.add_argument("--src-lang", type=str, default=None, help="Kod jezyka zrodlowego (NLLB). (nadpisuje config)")
+    ap.add_argument("--tgt-lang", type=str, default=None, help="Kod jezyka docelowego (NLLB). (nadpisuje config)")
+    ap.add_argument("--input", type=Path, default=None, help="Plik wejsciowy EN. (nadpisuje config)")
+    ap.add_argument("--output", type=Path, default=None, help="Plik wyjsciowy PL (hyp). (nadpisuje config)")
+    ap.add_argument("--batch-size", type=int, default=None, help="Batch size. (nadpisuje config)")
     ap.add_argument(
         "--input-max-length",
         type=int,
-        default=256,
-        help="Max dlugosc wejscia w tokenach (truncation), domyslnie: 256.",
+        default=None,
+        help="Max dlugosc wejscia w tokenach (truncation). (nadpisuje config)",
     )
     ap.add_argument(
         "--max-length",
         type=int,
-        default=128,
-        help="Max dlugosc wyjscia w tokenach (generate), domyslnie: 128.",
+        default=None,
+        help="Max dlugosc wyjscia w tokenach (generate). (nadpisuje config)",
     )
     args = ap.parse_args()
+
+    cfg = load_toml(Path(args.config))
+
+    model_name = str(pick(args.model, get_nested(cfg, ["baseline_nllb", "model_name"]), "facebook/nllb-200-distilled-600M"))
+    src_lang = str(pick(args.src_lang, get_nested(cfg, ["baseline_nllb", "src_lang"]), "eng_Latn"))
+    tgt_lang = str(pick(args.tgt_lang, get_nested(cfg, ["baseline_nllb", "tgt_lang"]), "pol_Latn"))
+
+    input_path = Path(pick(args.input, get_nested(cfg, ["paths", "splits_random_test_en"]), "data/splits_random/test.en"))
+    output_path = Path(pick(args.output, get_nested(cfg, ["paths", "baseline_output_pl"]), "outputs/baseline/test.hyp.pl"))
+
+    batch_size = int(pick(args.batch_size, get_nested(cfg, ["baseline_nllb", "batch_size"]), 4))
+    input_max_length = int(pick(args.input_max_length, get_nested(cfg, ["baseline_nllb", "input_max_length"]), 256))
+    max_length = int(pick(args.max_length, get_nested(cfg, ["baseline_nllb", "max_length"]), 128))
 
     device = torch.device("cpu")
 
     try:
-        tokenizer = AutoTokenizer.from_pretrained(args.model)
-        model = AutoModelForSeq2SeqLM.from_pretrained(args.model).to(device)
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        model = AutoModelForSeq2SeqLM.from_pretrained(model_name).to(device)
     except Exception as e:
         print("ERROR: nie udalo sie pobrac/zaladowac modelu lub tokenizera z Hugging Face.")
-        print(f"Model: {args.model}")
+        print(f"Model: {model_name}")
         print(f"Szczegoly: {type(e).__name__}: {e}")
         print()
         print("Wskazowka: jesli masz blokade sieci/proxy na huggingface.co, pobieranie modeli moze nie dzialac.")
         print("Upewnij sie tez, ze masz zainstalowane: torch + transformers + sentencepiece.")
         return 2
 
-    src = read_lines(args.input)
+    src = read_lines(input_path)
     t0 = time.perf_counter()
     hyps = batch_translate(
         model=model,
         tokenizer=tokenizer,
         texts=src,
-        batch_size=int(args.batch_size),
-        input_max_length=int(args.input_max_length),
-        output_max_length=int(args.max_length),
-        src_lang=str(args.src_lang),
-        tgt_lang=str(args.tgt_lang),
+        batch_size=batch_size,
+        input_max_length=input_max_length,
+        output_max_length=max_length,
+        src_lang=src_lang,
+        tgt_lang=tgt_lang,
     )
     t1 = time.perf_counter()
-    write_lines(args.output, hyps)
+    write_lines(output_path, hyps)
 
     print("=== BASELINE INFERENCE (CPU) ===")
-    print(f"Model: {args.model}")
-    print(f"Source lang: {args.src_lang}")
-    print(f"Target lang: {args.tgt_lang}")
-    print(f"Input: {args.input}")
-    print(f"Output: {args.output}")
+    print(f"Model: {model_name}")
+    print(f"Source lang: {src_lang}")
+    print(f"Target lang: {tgt_lang}")
+    print(f"Input: {input_path}")
+    print(f"Output: {output_path}")
     print(f"Sentences: {len(src)}")
     print(f"Total inference time [s]: {t1 - t0:.2f}")
 

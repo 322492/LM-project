@@ -1,0 +1,51 @@
+# Centralna konfiguracja projektu (Python 3.13: tomllib w stdlib).
+# Skrypty czytaja ten plik przez flagę: --config configs/default.toml
+#
+# Zasada: CLI zawsze moze nadpisac config (np. --batch-size 2).
+
+[paths]
+raw_dir = "data/raw"
+raw_en = "data/raw/bible-uedin.en-pl.en"
+raw_pl = "data/raw/bible-uedin.en-pl.pl"
+raw_xml = "data/raw/bible-uedin.en-pl.xml"
+
+splits_random_dir = "data/splits_random"
+splits_random_train_en = "data/splits_random/train.en"
+splits_random_train_pl = "data/splits_random/train.pl"
+splits_random_val_en = "data/splits_random/val.en"
+splits_random_val_pl = "data/splits_random/val.pl"
+splits_random_test_en = "data/splits_random/test.en"
+splits_random_test_pl = "data/splits_random/test.pl"
+
+baseline_output_pl = "outputs/baseline/test.hyp.pl"
+
+
+[random_split]
+seed = 2137
+train_ratio = 0.80
+val_ratio = 0.05
+test_ratio = 0.15
+show_indices = 5
+
+
+[sanity_check]
+samples = 8
+seed = 123
+short_words = 1
+long_words = 80
+percentiles = [1, 5, 10, 25, 50, 75, 90, 95, 99]
+
+
+[duplicates_check]
+examples = 8
+indices_per_example = 6
+short_max_words = 2
+
+
+[baseline_nllb]
+model_name = "facebook/nllb-200-distilled-600M"
+src_lang = "eng_Latn"
+tgt_lang = "pol_Latn"
+batch_size = 4
+input_max_length = 256
+max_length = 128

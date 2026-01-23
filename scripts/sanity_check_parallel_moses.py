@@ -20,6 +20,8 @@ from pathlib import Path
 from statistics import mean, median
 from typing import Iterable, List, Optional, Sequence, Tuple
 
+from config_utils import get_nested, load_toml, pick
+
 
 @dataclass
 class LengthStats:
@@ -259,9 +261,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
         description="Sanity check korpusu równoległego EN–PL (Moses: 1 linia = 1 segment).",
     )
     p.add_argument(
+        "--config",
+        type=Path,
+        default=Path("configs/default.toml"),
+        help="Plik config TOML.",
+    )
+    p.add_argument(
         "--raw-dir",
         type=Path,
-        default=Path("data/raw"),
+        default=None,
         help="Katalog z plikami źródłowymi (domyślnie: data/raw).",
     )
     p.add_argument(
@@ -276,25 +284,25 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=None,
         help="Ścieżka do pliku PL (.pl). Jeśli nie podasz, skrypt spróbuje wykryć plik w --raw-dir.",
     )
-    p.add_argument("--samples", type=int, default=8, help="Ile par wypisać do ręcznej kontroli (domyślnie: 8).")
-    p.add_argument("--seed", type=int, default=2137, help="Ziarno losowania przykładów (domyślnie: 2137).")
+    p.add_argument("--samples", type=int, default=None, help="Ile par wypisać do ręcznej kontroli. (nadpisuje config)")
+    p.add_argument("--seed", type=int, default=None, help="Ziarno losowania przykładów. (nadpisuje config)")
     p.add_argument(
         "--short-words",
         type=int,
-        default=1,
-        help="Próg 'bardzo krótka linia' w słowach (<=). Domyślnie: 1.",
+        default=None,
+        help="Próg 'bardzo krótka linia' w słowach (<=). (nadpisuje config)",
     )
     p.add_argument(
         "--long-words",
         type=int,
-        default=80,
-        help="Próg 'bardzo długa linia' w słowach (>=). Domyślnie: 80.",
+        default=None,
+        help="Próg 'bardzo długa linia' w słowach (>=). (nadpisuje config)",
     )
     p.add_argument(
         "--percentiles",
         type=str,
-        default="1,5,10,25,50,75,90,95,99",
-        help="Lista percentyli do policzenia, np. '1,5,50,95,99'.",
+        default=None,
+        help="Lista percentyli do policzenia, np. '1,5,50,95,99'. (nadpisuje config)",
     )
     return p
 
@@ -302,7 +310,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = build_arg_parser().parse_args()
 
-    raw_dir: Path = args.raw_dir
+    cfg = load_toml(Path(args.config))
+
+    raw_dir = Path(pick(args.raw_dir, get_nested(cfg, ["paths", "raw_dir"]), "data/raw"))
     en_path: Optional[Path] = args.en_file
     pl_path: Optional[Path] = args.pl_file
 
@@ -314,16 +324,20 @@ def main() -> int:
     en_path = en_path.resolve()
     pl_path = pl_path.resolve()
 
-    percentiles = [int(x.strip()) for x in str(args.percentiles).split(",") if x.strip()]
+    if args.percentiles is not None:
+        percentiles = [int(x.strip()) for x in str(args.percentiles).split(",") if x.strip()]
+    else:
+        cfg_ps = get_nested(cfg, ["sanity_check", "percentiles"])
+        percentiles = [int(x) for x in cfg_ps] if isinstance(cfg_ps, list) else [1, 5, 10, 25, 50, 75, 90, 95, 99]
     percentiles = sorted(set(percentiles))
 
     return run_sanity_check(
         en_path=en_path,
         pl_path=pl_path,
-        sample_k=int(args.samples),
-        seed=int(args.seed),
-        short_words=int(args.short_words),
-        long_words=int(args.long_words),
+        sample_k=int(pick(args.samples, get_nested(cfg, ["sanity_check", "samples"]), 8)),
+        seed=int(pick(args.seed, get_nested(cfg, ["sanity_check", "seed"]), 123)),
+        short_words=int(pick(args.short_words, get_nested(cfg, ["sanity_check", "short_words"]), 1)),
+        long_words=int(pick(args.long_words, get_nested(cfg, ["sanity_check", "long_words"]), 80)),
         percentiles=percentiles,
     )
 

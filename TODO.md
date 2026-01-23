@@ -8,6 +8,7 @@ Poniższa lista jest podzielona na etapy. Elementy, których nie da się ustali�
 - [ ] Ustalić format oddania (repo + raport + prezentacja) i wymagania prowadzącego (zakres, minimalne elementy).
 - [ ] Zdefiniować minimalny zakres eksperymentów (ile konfiguracji treningu / ile wariantów danych) i co jest „must-have”.
 - [ ] Ustalić konwencje w repo (struktura katalogów, nazwy plików, sposób zapisu wyników).
+- [x] Wprowadzić centralny plik konfiguracji `configs/default.toml` (ścieżki/parametry) oraz zasadę: CLI nadpisuje config.
 - [ ] Określić i zanotować **budżet obliczeniowy** jako plan testów:
   - [ ] Czy dostępne jest GPU? (lokalnie / uczelniane / chmura)
   - [ ] Jeśli tylko CPU: czy trening jest wykonalny w czasie projektu?

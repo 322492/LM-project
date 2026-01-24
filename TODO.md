@@ -18,6 +18,7 @@ Poniższa lista jest podzielona na etapy. Elementy, których nie da się ustali�
 - [x] Pozyskać pary równoległe **EN–PL dla Biblii** (OPUS: Bible-uedin; format Moses + XML).
 - [ ] Sprawdzić licencję/warunki użycia danych i zanotować je w repo.
 - [x] Wykonać sanity check korpusu równoległego (Moses .en/.pl: spójność linii, puste segmenty, statystyki długości, losowe próbki) — wynik: **60821** par, puste segmenty: 0, pojedyncze outliery długościowe.
+- [x] Sprawdzić duplikaty (exact match) w korpusie: EN, PL oraz par (EN,PL) — duplikaty par ~0.73%.
 - [ ] Ustalić schemat podziału danych biblijnych:
   - [ ] train/valid/test (np. na poziomie wersetów/rozdziałów/ksiąg – do decyzji)
   - [ ] zasady, aby nie mieszać bardzo podobnych fragmentów między splitami
@@ -35,7 +36,8 @@ Poniższa lista jest podzielona na etapy. Elementy, których nie da się ustali�
 - [ ] Udokumentować dokładnie finalne rozmiary zbiorów (liczba segmentów, średnia długość, itp.).
 
 ## Model i trening (fine-tuning)
-- [ ] Wybrać bazowy **model tłumaczeniowy EN→PL** do fine-tuningu (kryteria: dostępność, rozmiar, wykonalność obliczeniowa).
+- [x] Wybrać model bazowy (baseline) do tłumaczenia EN→PL: `facebook/nllb-200-distilled-600M`.
+- [ ] Fine-tuning modelu na danych biblijnych (korpus równoległy EN–PL).
 - [ ] Ustalić sposób tokenizacji/segmentacji zgodny z wybranym modelem (bez zmian „na ślepo”).
 - [ ] Przygotować pipeline treningowy:
   - [ ] konfiguracja hiperparametrów (learning rate, batch size, max length, liczba epok, warmup, itp.)
@@ -53,14 +55,18 @@ Poniższa lista jest podzielona na etapy. Elementy, których nie da się ustali�
 - [ ] Ustalić baseline do porównania:
   - [ ] model bazowy **przed** fine-tuningiem
   - [ ] ewentualnie prosta dodatkowa kontrola (np. inny checkpoint / inna konfiguracja) – jeśli czas pozwoli
+- [x] Baseline inference (EN→PL) na zbiorze testowym: `outputs/baseline/test.hyp.pl`.
+- [x] Ewaluacja baseline (BLEU + opcjonalnie chrF): `outputs/baseline/metrics.txt`.
 - [ ] Przeprowadzić ewaluację na:
   - [ ] Biblia (test in-domain)
   - [ ] Teksty współczesne (test out-of-domain)
   - [ ] Teksty techniczne (test out-of-domain)
+- [ ] Test generalizacji: porównać wyniki Biblia (in-domain) vs teksty współczesne i techniczne (out-of-domain).
 - [ ] Zebrać wyniki w powtarzalnym formacie (tabelka + pliki wynikowe).
 - [ ] Przygotować próbkę jakościową (kilkanaście–kilkadziesiąt przykładów) do analizy błędów.
 
 ## Analiza wyników
+- [ ] Porównać baseline vs fine-tuned (po metrykach i na przykładach).
 - [ ] Porównać: baseline vs po fine-tuningu (oddzielnie dla in-domain i out-of-domain).
 - [ ] Sprawdzić, czy fine-tuning poprawił Biblię kosztem degradacji na innych domenach (lub odwrotnie) – opisać wprost.
 - [ ] Przeprowadzić krótką analizę błędów:

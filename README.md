@@ -37,6 +37,16 @@ Poniżej znajdują się wyłącznie decyzje już podjęte:
 - Sprawdzenie duplikatów (exact match) pokazało, że duplikaty par (EN,PL) to ok. **0.73%** — ryzyko przecieku przez identyczne pary jest niskie.
 - Dlatego wybrano prosty losowy split (zgodny z praktyką z ćwiczeń) jako punkt startowy do dalszych eksperymentów.
 
+## Model bazowy
+- model: `facebook/nllb-200-distilled-600M`
+- uzasadnienie:
+  - poprawny kierunek **EN→PL**,
+  - publicznie dostępny model,
+  - dobra jakość tłumaczeń,
+  - możliwość uruchomienia inference na CPU.
+
+Nie istnieje publicznie dostępny model **OPUS-MT EN→PL** od **Helsinki-NLP**, dlatego jako baseline wybrano model multilingual (NLLB).
+
 ## Konfiguracja (config)
 - Centralny plik ustawień: `configs/default.toml` (ścieżki, seedy, parametry skryptów).
 - Skrypty wspierają flagę `--config` oraz zasadę: **CLI nadpisuje wartości z configa**.

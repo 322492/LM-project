@@ -18,6 +18,7 @@ splits_random_test_en = "data/splits_random/test.en"
 splits_random_test_pl = "data/splits_random/test.pl"
 
 baseline_output_pl = "outputs/baseline/test.hyp.pl"
+baseline_metrics_txt = "outputs/baseline/metrics.txt"
 
 
 [random_split]
@@ -44,6 +45,7 @@ short_max_words = 2
 
 [baseline_nllb]
 model_name = "facebook/nllb-200-distilled-600M"
+# #model_name = "distilbert-base-multilingual-cased"
 src_lang = "eng_Latn"
 tgt_lang = "pol_Latn"
 batch_size = 4

@@ -17,9 +17,10 @@ Skrypt:
 from __future__ import annotations
 
 import argparse
+import random
 import time
 from pathlib import Path
-from typing import List, Sequence
+from typing import List, Sequence, Tuple
 
 import torch
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
@@ -45,7 +46,8 @@ def batch_translate(
     texts: Sequence[str],
     batch_size: int,
     input_max_length: int,
-    output_max_length: int,
+    max_new_tokens: int,
+    num_beams: int,
     src_lang: str,
     tgt_lang: str,
     log_every: int = 0,
@@ -74,7 +76,7 @@ def batch_translate(
         raise ValueError(f"Nie udalo sie wyznaczyc forced_bos_token_id dla tgt_lang={tgt_lang!r}.")
 
     start_t = time.perf_counter()
-    with torch.no_grad():
+    with torch.inference_mode():
         for start in range(0, len(texts), batch_size):
             batch = list(texts[start : start + batch_size])
 
@@ -98,7 +100,8 @@ def batch_translate(
 
             gen = model.generate(
                 **enc,
-                max_length=output_max_length,  # jawnie ustawione
+                max_new_tokens=int(max_new_tokens),
+                num_beams=int(num_beams),
                 forced_bos_token_id=int(forced_bos_token_id),
             )
             decoded = tokenizer.batch_decode(gen, skip_special_tokens=True)
@@ -123,6 +126,28 @@ def batch_translate(
     return out
 
 
+def _select_indices(n: int, max_sentences: int, sample: bool, seed: int) -> List[int]:
+    """
+    Zwraca listę indeksów 0-based wybranych do inference.
+    Zasada:
+    - max_sentences <= 0 => wszystkie zdania
+    - sample=False => pierwsze max_sentences
+    - sample=True  => losowa próbka bez powtórzeń, ale posortowana rosnąco (zachowanie kolejności wyjściowej)
+    """
+    if n <= 0:
+        return []
+    if max_sentences <= 0:
+        return list(range(n))
+
+    k = min(max_sentences, n)
+    if not sample:
+        return list(range(k))
+
+    rng = random.Random(seed)
+    picked = rng.sample(range(n), k=k)
+    return sorted(picked)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Baseline inference EN->PL (CPU) dla NLLB.")
     ap.add_argument("--config", type=Path, default=Path("configs/default.toml"), help="Plik config TOML.")
@@ -130,20 +155,33 @@ def main() -> int:
     ap.add_argument("--src-lang", type=str, default=None, help="Kod jezyka zrodlowego (NLLB). (nadpisuje config)")
     ap.add_argument("--tgt-lang", type=str, default=None, help="Kod jezyka docelowego (NLLB). (nadpisuje config)")
     ap.add_argument("--input", type=Path, default=None, help="Plik wejsciowy EN. (nadpisuje config)")
-    ap.add_argument("--output", type=Path, default=None, help="Plik wyjsciowy PL (hyp). (nadpisuje config)")
-    ap.add_argument("--batch-size", type=int, default=None, help="Batch size. (nadpisuje config)")
+    ap.add_argument(
+        "--output",
+        type=Path,
+        default=Path("outputs/baseline/test.hyp.pl"),
+        help="Plik wyjsciowy PL (hyp). (domyslnie: outputs/baseline/test.hyp.pl; nadpisuje config)",
+    )
+    ap.add_argument("--batch-size", type=int, default=4, help="Batch size (domyslnie: 4; nadpisuje config)")
     ap.add_argument(
         "--input-max-length",
         type=int,
-        default=None,
-        help="Max dlugosc wejscia w tokenach (truncation). (nadpisuje config)",
+        default=256,
+        help="Max dlugosc wejscia w tokenach (truncation). (domyslnie: 256; nadpisuje config)",
+    )
+    ap.add_argument("--max-new-tokens", type=int, default=64, help="Max new tokens (generate). (domyslnie: 64)")
+    ap.add_argument("--num-beams", type=int, default=1, help="Liczba belek (domyslnie: 1 = greedy decoding)")
+    ap.add_argument(
+        "--max-sentences",
+        type=int,
+        default=500,
+        help="Limit liczby zdan do przetworzenia (0 = caly plik). Domyslnie: 500.",
     )
     ap.add_argument(
-        "--max-length",
-        type=int,
-        default=None,
-        help="Max dlugosc wyjscia w tokenach (generate). (nadpisuje config)",
+        "--sample",
+        action="store_true",
+        help="Jesli ustawione, wybiera losowa probke zdan (bez powtorzen) zamiast brac pierwsze N.",
     )
+    ap.add_argument("--seed", type=int, default=123, help="Seed do probkowania (domyslnie: 123).")
     ap.add_argument(
         "--log-every",
         type=int,
@@ -159,11 +197,16 @@ def main() -> int:
     tgt_lang = str(pick(args.tgt_lang, get_nested(cfg, ["baseline_nllb", "tgt_lang"]), "pol_Latn"))
 
     input_path = Path(pick(args.input, get_nested(cfg, ["paths", "splits_random_test_en"]), "data/splits_random/test.en"))
+    # output: domyslnie z CLI; jeśli user poda --output, też tu trafia
     output_path = Path(pick(args.output, get_nested(cfg, ["paths", "baseline_output_pl"]), "outputs/baseline/test.hyp.pl"))
 
     batch_size = int(pick(args.batch_size, get_nested(cfg, ["baseline_nllb", "batch_size"]), 4))
     input_max_length = int(pick(args.input_max_length, get_nested(cfg, ["baseline_nllb", "input_max_length"]), 256))
-    max_length = int(pick(args.max_length, get_nested(cfg, ["baseline_nllb", "max_length"]), 128))
+    max_new_tokens = int(pick(args.max_new_tokens, get_nested(cfg, ["baseline_nllb", "max_new_tokens"]), 64))
+    num_beams = int(pick(args.num_beams, get_nested(cfg, ["baseline_nllb", "num_beams"]), 1))
+    max_sentences = int(pick(args.max_sentences, get_nested(cfg, ["baseline_nllb", "max_sentences"]), 500))
+    sample = bool(pick(args.sample, get_nested(cfg, ["baseline_nllb", "sample"]), False))
+    seed = int(pick(args.seed, get_nested(cfg, ["baseline_nllb", "seed"]), 123))
     log_every = int(pick(args.log_every, get_nested(cfg, ["baseline_nllb", "log_every"]), 64))
 
     device = torch.device("cpu")
@@ -178,21 +221,17 @@ def main() -> int:
         print()
         return 2
 
-    src = read_lines(input_path)
-    t0 = time.perf_counter()
-    hyps = batch_translate(
-        model=model,
-        tokenizer=tokenizer,
-        texts=src,
-        batch_size=batch_size,
-        input_max_length=input_max_length,
-        output_max_length=max_length,
-        src_lang=src_lang,
-        tgt_lang=tgt_lang,
-        log_every=log_every,
-    )
-    t1 = time.perf_counter()
-    write_lines(output_path, hyps)
+    src_all = read_lines(input_path)
+    indices = _select_indices(len(src_all), max_sentences=max_sentences, sample=sample, seed=seed)
+    src = [src_all[i] for i in indices]
+
+    # Jeśli sampling, zapisz indeksy obok outputu
+    if sample:
+        indices_path = output_path.parent / f"{output_path.stem}.indices.txt"
+        indices_path.parent.mkdir(parents=True, exist_ok=True)
+        with indices_path.open("w", encoding="utf-8", newline="\n") as f:
+            for i in indices:
+                f.write(str(i) + "\n")
 
     print("=== BASELINE INFERENCE (CPU) ===")
     print(f"Model: {model_name}")
@@ -200,8 +239,43 @@ def main() -> int:
     print(f"Target lang: {tgt_lang}")
     print(f"Input: {input_path}")
     print(f"Output: {output_path}")
-    print(f"Sentences: {len(src)}")
-    print(f"Total inference time [s]: {t1 - t0:.2f}")
+    print(f"Total sentences in file: {len(src_all)}")
+    print(f"Selected sentences: {len(src)}")
+    print(f"max_sentences: {max_sentences} | sample: {sample} | seed: {seed}")
+    print(f"batch_size: {batch_size} | input_max_length: {input_max_length} | max_new_tokens: {max_new_tokens} | num_beams: {num_beams}")
+    print()
+
+    t0 = time.perf_counter()
+    hyps = batch_translate(
+        model=model,
+        tokenizer=tokenizer,
+        texts=src,
+        batch_size=batch_size,
+        input_max_length=input_max_length,
+        max_new_tokens=max_new_tokens,
+        num_beams=num_beams,
+        src_lang=src_lang,
+        tgt_lang=tgt_lang,
+        log_every=log_every,
+    )
+    t1 = time.perf_counter()
+    write_lines(output_path, hyps)
+
+    elapsed = t1 - t0
+    speed = (len(src) / elapsed) if elapsed > 0 else 0.0
+    print(f"Done. Sentences processed: {len(src)}")
+    print(f"Total inference time [s]: {elapsed:.2f}")
+    print(f"Speed [sent/s]: {speed:.2f}")
+
+    # 3 pierwsze tłumaczenia do szybkiej kontroli
+    print()
+    print("== Preview (first 3) ==")
+    for j in range(min(3, len(src))):
+        print("-" * 60)
+        print(f"[idx={indices[j]}] EN: {src[j]}")
+        print(f"[idx={indices[j]}] PL: {hyps[j]}")
+    if len(src) > 0:
+        print("-" * 60)
 
     return 0
 

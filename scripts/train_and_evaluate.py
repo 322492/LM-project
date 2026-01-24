@@ -31,6 +31,8 @@ data = load_translation_data()
 
 # Step 2: Load Pre-trained Tokenizer and Model
 model_name = "Helsinki-NLP/opus-mt-pl-en"
+#model_name = "distilbert-base-multilingual-cased"
+
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
 # Step 3: Tokenization Function

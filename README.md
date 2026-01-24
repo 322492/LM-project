@@ -52,5 +52,22 @@ Nie istnieje publicznie dostępny model **OPUS-MT EN→PL** od **Helsinki-NLP**,
 - Skrypty wspierają flagę `--config` oraz zasadę: **CLI nadpisuje wartości z configa**.
 - Wspólny helper do wczytywania configa: `scripts/config_utils.py`.
 
+## Out-of-domain test sets
+Projekt przewiduje **2 zbiory testowe out-of-domain** do ewaluacji generalizacji:
+
+1. **Contemporary** (teksty współczesne): `data/ood/contemporary.{en,pl}`
+   - Docelowo: 200-500 par z tekstów współczesnych (news, blogi, literatura współczesna).
+2. **Technical** (teksty techniczne): `data/ood/technical.{en,pl}`
+   - Docelowo: 200-500 par z tekstów technicznych (dokumentacja IT, artykuły naukowe, instrukcje).
+
+**Status:** ⚠️ Na razie są to **placeholdery** — wymagają uzupełnienia źródłem danych i licencją.
+
+Szczegóły i checklista do uzupełnienia: **[`data/ood/README.md`](data/ood/README.md)**
+
+Aby wygenerować szablon dokumentacji:
+```bash
+python scripts/ood_template_builder.py
+```
+
 ## TODO (checklista)
 Szczegółowa checklista projektu jest w pliku: **[`TODO.md`](TODO.md)**.

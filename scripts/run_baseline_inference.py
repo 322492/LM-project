@@ -17,8 +17,10 @@ Skrypt:
 from __future__ import annotations
 
 import argparse
+import json
 import random
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import List, Sequence, Tuple
 
@@ -38,6 +40,10 @@ def write_lines(path: Path, lines: Sequence[str]) -> None:
     with path.open("w", encoding="utf-8", newline="\n") as f:
         for s in lines:
             f.write(s + "\n")
+
+def write_json(path: Path, obj: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(obj, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def batch_translate(
@@ -155,12 +161,7 @@ def main() -> int:
     ap.add_argument("--src-lang", type=str, default=None, help="Kod jezyka zrodlowego (NLLB). (nadpisuje config)")
     ap.add_argument("--tgt-lang", type=str, default=None, help="Kod jezyka docelowego (NLLB). (nadpisuje config)")
     ap.add_argument("--input", type=Path, default=None, help="Plik wejsciowy EN. (nadpisuje config)")
-    ap.add_argument(
-        "--output",
-        type=Path,
-        default=Path("outputs/baseline/test.hyp.pl"),
-        help="Plik wyjsciowy PL (hyp). (domyslnie: outputs/baseline/test.hyp.pl; nadpisuje config)",
-    )
+    ap.add_argument("--output", type=Path, default=None, help="Plik wyjsciowy PL (hyp). (nadpisuje domyslne nazwy i config)")
     ap.add_argument("--batch-size", type=int, default=4, help="Batch size (domyslnie: 4; nadpisuje config)")
     ap.add_argument(
         "--input-max-length",
@@ -183,6 +184,18 @@ def main() -> int:
     )
     ap.add_argument("--seed", type=int, default=123, help="Seed do probkowania (domyslnie: 123).")
     ap.add_argument(
+        "--save-ref-subset",
+        action="store_true",
+        default=None,
+        help="Zapisz dopasowane referencje obok hyps (quick run). Jeśli nie podasz, quick=True, full=False.",
+    )
+    ap.add_argument(
+        "--no-save-ref-subset",
+        action="store_true",
+        default=None,
+        help="Nie zapisuj dopasowanych referencji obok hyps.",
+    )
+    ap.add_argument(
         "--log-every",
         type=int,
         default=None,
@@ -197,8 +210,7 @@ def main() -> int:
     tgt_lang = str(pick(args.tgt_lang, get_nested(cfg, ["baseline_nllb", "tgt_lang"]), "pol_Latn"))
 
     input_path = Path(pick(args.input, get_nested(cfg, ["paths", "splits_random_test_en"]), "data/splits_random/test.en"))
-    # output: domyslnie z CLI; jeśli user poda --output, też tu trafia
-    output_path = Path(pick(args.output, get_nested(cfg, ["paths", "baseline_output_pl"]), "outputs/baseline/test.hyp.pl"))
+    refs_full_path = Path(pick(None, get_nested(cfg, ["paths", "splits_random_test_pl"]), "data/splits_random/test.pl"))
 
     batch_size = int(pick(args.batch_size, get_nested(cfg, ["baseline_nllb", "batch_size"]), 4))
     input_max_length = int(pick(args.input_max_length, get_nested(cfg, ["baseline_nllb", "input_max_length"]), 256))
@@ -208,6 +220,26 @@ def main() -> int:
     sample = bool(pick(args.sample, get_nested(cfg, ["baseline_nllb", "sample"]), False))
     seed = int(pick(args.seed, get_nested(cfg, ["baseline_nllb", "seed"]), 123))
     log_every = int(pick(args.log_every, get_nested(cfg, ["baseline_nllb", "log_every"]), 64))
+
+    quick = max_sentences > 0
+
+    # Domyślne ścieżki outputu zależne od trybu:
+    # - quick: outputs/baseline/quick_{N}.hyp.pl
+    # - full:  outputs/baseline/full_test.hyp.pl (z configa paths.baseline_output_pl)
+    default_full_out = Path(get_nested(cfg, ["paths", "baseline_output_pl"], "outputs/baseline/full_test.hyp.pl"))
+    if quick:
+        default_out = Path(f"outputs/baseline/quick_{max_sentences}.hyp.pl")
+    else:
+        default_out = default_full_out
+
+    output_path = Path(pick(args.output, None, default_out))
+
+    # save-ref-subset domyślnie: quick=True, full=False
+    save_ref_subset = True if quick else False
+    if args.save_ref_subset:
+        save_ref_subset = True
+    if args.no_save_ref_subset:
+        save_ref_subset = False
 
     device = torch.device("cpu")
 
@@ -225,13 +257,23 @@ def main() -> int:
     indices = _select_indices(len(src_all), max_sentences=max_sentences, sample=sample, seed=seed)
     src = [src_all[i] for i in indices]
 
-    # Jeśli sampling, zapisz indeksy obok outputu
+    # Sidecar paths obok hyps:
+    # - *.indices.txt: jeśli sample=True
+    # - *.ref.pl: jeśli quick i save_ref_subset=True
+    indices_path = output_path.with_name(f"{output_path.stem}.indices.txt")
+    ref_subset_path = output_path.with_name(f"{output_path.stem}.ref.pl")
+    meta_path = output_path.with_name(f"{output_path.name}.meta.json")
+
     if sample:
-        indices_path = output_path.parent / f"{output_path.stem}.indices.txt"
         indices_path.parent.mkdir(parents=True, exist_ok=True)
         with indices_path.open("w", encoding="utf-8", newline="\n") as f:
             for i in indices:
                 f.write(str(i) + "\n")
+
+    if quick and save_ref_subset:
+        refs_all = read_lines(refs_full_path)
+        refs_subset = [refs_all[i] for i in indices if i < len(refs_all)]
+        write_lines(ref_subset_path, refs_subset)
 
     print("=== BASELINE INFERENCE (CPU) ===")
     print(f"Model: {model_name}")
@@ -243,6 +285,7 @@ def main() -> int:
     print(f"Selected sentences: {len(src)}")
     print(f"max_sentences: {max_sentences} | sample: {sample} | seed: {seed}")
     print(f"batch_size: {batch_size} | input_max_length: {input_max_length} | max_new_tokens: {max_new_tokens} | num_beams: {num_beams}")
+    print(f"quick: {quick} | save_ref_subset: {save_ref_subset}")
     print()
 
     t0 = time.perf_counter()
@@ -260,6 +303,31 @@ def main() -> int:
     )
     t1 = time.perf_counter()
     write_lines(output_path, hyps)
+
+    # Metadane runu do powtarzalności (do wykorzystania w ewaluacji/README.txt)
+    meta = {
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "mode": "quick" if quick else "full",
+        "model": model_name,
+        "src_lang": src_lang,
+        "tgt_lang": tgt_lang,
+        "batch_size": batch_size,
+        "input_max_length": input_max_length,
+        "max_new_tokens": max_new_tokens,
+        "num_beams": num_beams,
+        "max_sentences": max_sentences,
+        "sample": sample,
+        "seed": seed,
+        "input_path": str(input_path),
+        "refs_full_path": str(refs_full_path),
+        "output_path": str(output_path),
+        "ref_subset_path": str(ref_subset_path) if (quick and save_ref_subset) else None,
+        "indices_path": str(indices_path) if sample else None,
+        "lines_in_file": len(src_all),
+        "lines_selected": len(src),
+        "inference_time_s": float(t1 - t0),
+    }
+    write_json(meta_path, meta)
 
     elapsed = t1 - t0
     speed = (len(src) / elapsed) if elapsed > 0 else 0.0

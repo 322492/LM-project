@@ -17,7 +17,7 @@ splits_random_val_pl = "data/splits_random/val.pl"
 splits_random_test_en = "data/splits_random/test.en"
 splits_random_test_pl = "data/splits_random/test.pl"
 
-baseline_output_pl = "outputs/baseline/test.hyp.pl"
+baseline_output_pl = "outputs/baseline/full_test.hyp.pl"
 baseline_metrics_txt = "outputs/baseline/metrics.txt"
 
 
@@ -50,7 +50,7 @@ src_lang = "eng_Latn"
 tgt_lang = "pol_Latn"
 batch_size = 4
 input_max_length = 256
-log_every = 64
+log_every = 50
 max_new_tokens = 64
 num_beams = 1
 max_sentences = 500

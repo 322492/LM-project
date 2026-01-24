@@ -1,0 +1,37 @@
+# Konfiguracja fine-tuningu na CPU (mT5-small)
+# Model: google/mt5-small (multilingual T5, encoder-decoder)
+
+[finetune_mt5]
+model_name = "google/mt5-small"
+src_lang = "en"
+tgt_lang = "pl"
+
+# Ścieżki do danych
+train_en = "data/splits_random/train.en"
+train_pl = "data/splits_random/train.pl"
+val_en = "data/splits_random/val.en"
+val_pl = "data/splits_random/val.pl"
+test_en = "data/splits_random/test.en"
+test_pl = "data/splits_random/test.pl"
+
+# Parametry treningu (CPU-friendly)
+max_source_length = 128
+max_target_length = 128
+batch_size = 2
+grad_accum_steps = 8  # efektywny batch = 2 * 8 = 16
+learning_rate = 5.0e-5
+num_epochs = 1
+warmup_ratio = 0.03
+seed = 2137
+
+# Katalog wyjściowy
+output_dir = "outputs/finetuned/mt5_small"
+
+# Ewaluacja podczas treningu
+eval_steps = 500  # co ile kroków liczyć metryki na walidacji
+save_steps = 500  # co ile kroków zapisywać checkpoint
+logging_steps = 50  # co ile kroków logować loss
+
+# Generowanie podczas ewaluacji
+num_beams = 4
+max_new_tokens = 128

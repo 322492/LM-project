@@ -37,15 +37,35 @@ Poniżej znajdują się wyłącznie decyzje już podjęte:
 - Sprawdzenie duplikatów (exact match) pokazało, że duplikaty par (EN,PL) to ok. **0.73%** — ryzyko przecieku przez identyczne pary jest niskie.
 - Dlatego wybrano prosty losowy split (zgodny z praktyką z ćwiczeń) jako punkt startowy do dalszych eksperymentów.
 
-## Model bazowy
-- model: `facebook/nllb-200-distilled-600M`
-- uzasadnienie:
+## Model bazowy (baseline)
+- **Model**: `facebook/nllb-200-distilled-600M` (NLLB-200, multilingual)
+- **Użycie**: tylko **inference** (bez fine-tuningu)
+- **Uzasadnienie**:
   - poprawny kierunek **EN→PL**,
   - publicznie dostępny model,
   - dobra jakość tłumaczeń,
   - możliwość uruchomienia inference na CPU.
 
 Nie istnieje publicznie dostępny model **OPUS-MT EN→PL** od **Helsinki-NLP**, dlatego jako baseline wybrano model multilingual (NLLB).
+
+## Fine-tuning (CPU, mały model)
+- **Model**: `google/mt5-small` (multilingual T5, encoder-decoder)
+- **Uzasadnienie wyboru mT5-small**:
+  - **mniejszy rozmiar** niż NLLB-200 (możliwy fine-tuning na CPU),
+  - **encoder-decoder architecture** (odpowiednia dla seq2seq),
+  - **multilingual** (obsługuje EN i PL),
+  - **publicznie dostępny** na Hugging Face Hub.
+- **Konfiguracja**: `configs/finetune_cpu.toml`
+- **Parametry treningu** (CPU-friendly):
+  - batch_size=2, gradient_accumulation_steps=8 (efektywny batch=16),
+  - max_source_length=128, max_target_length=128,
+  - learning_rate=5e-5, num_epochs=1 (sanity + 1 epoka),
+  - warmup_ratio=0.03, seed=2137.
+- **Skrypty**:
+  - `scripts/finetune_mt5_cpu.py` — trening z metrykami BLEU/chrF na walidacji,
+  - `scripts/eval_finetuned.py` — ewaluacja na zbiorze testowym.
+
+**Uwaga**: NLLB pozostaje jako **baseline inference** (bez fine-tuningu), mT5-small jest fine-tunowany na danych biblijnych.
 
 ## Konfiguracja (config)
 - Centralny plik ustawień: `configs/default.toml` (ścieżki, seedy, parametry skryptów).

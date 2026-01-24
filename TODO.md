@@ -36,8 +36,13 @@ Poniższa lista jest podzielona na etapy. Elementy, których nie da się ustali�
 - [ ] Udokumentować dokładnie finalne rozmiary zbiorów (liczba segmentów, średnia długość, itp.).
 
 ## Model i trening (fine-tuning)
-- [x] Wybrać model bazowy (baseline) do tłumaczenia EN→PL: `facebook/nllb-200-distilled-600M`.
-- [ ] Fine-tuning modelu na danych biblijnych (korpus równoległy EN–PL).
+- [x] Wybrać model bazowy (baseline) do tłumaczenia EN→PL: `facebook/nllb-200-distilled-600M` (NLLB, tylko inference).
+- [ ] Fine-tuning małego modelu (mT5-small) na CPU (sanity + 1 epoka):
+  - [ ] Konfiguracja: `configs/finetune_cpu.toml`
+  - [ ] Skrypt treningowy: `scripts/finetune_mt5_cpu.py`
+  - [ ] Skrypt ewaluacji: `scripts/eval_finetuned.py`
+  - [ ] Uruchomienie sanity run (mały wycinek danych)
+  - [ ] Uruchomienie pełnego treningu (1 epoka)
 - [ ] Ustalić sposób tokenizacji/segmentacji zgodny z wybranym modelem (bez zmian „na ślepo”).
 - [ ] Przygotować pipeline treningowy:
   - [ ] konfiguracja hiperparametrów (learning rate, batch size, max length, liczba epok, warmup, itp.)
@@ -51,12 +56,12 @@ Poniższa lista jest podzielona na etapy. Elementy, których nie da się ustali�
   - [ ] checkpoint końcowy + informację, który checkpoint jest „najlepszy” wg walidacji
 
 ## Ewaluacja (in-domain i out-of-domain)
-- [ ] Zdefiniować metryki automatyczne (np. BLEU/chrF lub inne – do decyzji) i sposób ich liczenia.
-- [ ] Ustalić baseline do porównania:
-  - [ ] model bazowy **przed** fine-tuningiem
-  - [ ] ewentualnie prosta dodatkowa kontrola (np. inny checkpoint / inna konfiguracja) – jeśli czas pozwoli
-- [x] Baseline inference (EN→PL) na zbiorze testowym: `outputs/baseline/test.hyp.pl`.
-- [x] Ewaluacja baseline (BLEU + opcjonalnie chrF): `outputs/baseline/metrics.txt`.
+- [x] Zdefiniować metryki automatyczne: **BLEU i chrF** (sacrebleu).
+- [x] Ustalić baseline do porównania:
+  - [x] **Baseline (NLLB)**: model bazowy **przed** fine-tuningiem (inference tylko)
+  - [ ] **Fine-tuned (mT5-small)**: model po fine-tuningu na danych biblijnych
+- [x] Baseline inference (EN→PL) na zbiorze testowym: `outputs/baseline/full_test.hyp.pl`.
+- [x] Ewaluacja baseline (BLEU + opcjonalnie chrF): `outputs/baseline/full_test.metrics.txt`.
 - [ ] Przeprowadzić ewaluację na:
   - [ ] Biblia (test in-domain)
   - [ ] Teksty współczesne (test out-of-domain)

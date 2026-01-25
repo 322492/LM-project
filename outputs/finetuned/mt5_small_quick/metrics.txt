@@ -1,0 +1,9 @@
+=== METRYKI FINE-TUNED mT5-small ===
+checkpoint: outputs\finetuned\mt5_small_quick\checkpoint-150
+test_en: outputs\finetuned\mt5_small_quick\test_subset.en
+test_pl: outputs\finetuned\mt5_small_quick\test_subset.pl
+output_hyp: outputs\finetuned\mt5_small_quick\test.hyp.pl
+lines: 200
+
+BLEU: BLEU = 0.02 8.8/0.0/0.0/0.0 (BP = 0.377 ratio = 0.506 hyp_len = 2401 ref_len = 4746)
+chrF: chrF2 = 2.68

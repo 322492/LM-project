@@ -1,0 +1,7 @@
+=== BASELINE METRICS (EN->PL) ===
+refs: data\splits_random\test.pl
+hyps: outputs\baseline\test.hyp.pl
+lines_used: 200 (refs=9124, hyps=200)
+
+BLEU: BLEU = 10.30 45.5/15.4/6.4/3.1 (BP = 0.945 ratio = 0.947 hyp_len = 4730 ref_len = 4997)
+chrF: chrF2 = 37.00

@@ -64,9 +64,34 @@ def main() -> int:
     cfg = load_toml(Path(args.config))
 
     # Wczytaj parametry
-    checkpoint_dir = Path(
-        pick(args.checkpoint, get_nested(cfg, ["finetune_mt5", "output_dir"]), "outputs/finetuned/mt5_small")
+    checkpoint_base_dir = Path(
+        pick(args.checkpoint, get_nested(cfg, ["finetune_mt5", "output_dir"]), "outputs/finetuned/mt5_small_quick")
     )
+    
+    # Sprawdź, czy katalog istnieje
+    if not checkpoint_base_dir.exists():
+        print(f"ERROR: Katalog checkpointu nie istnieje: {checkpoint_base_dir}")
+        print("Sprawdź, czy trening został ukończony i checkpoint został zapisany.")
+        return 1
+    
+    # Sprawdź, czy w katalogu jest bezpośrednio model.safetensors (finalny checkpoint)
+    # lub są podkatalogi checkpoint-*
+    if (checkpoint_base_dir / "model.safetensors").exists() or (checkpoint_base_dir / "pytorch_model.bin").exists():
+        # Finalny checkpoint w głównym katalogu
+        checkpoint_dir = checkpoint_base_dir
+    else:
+        # Szukaj checkpoint-* podkatalogów
+        checkpoint_dirs = sorted(checkpoint_base_dir.glob("checkpoint-*"), key=lambda x: int(x.name.split("-")[-1]), reverse=True)
+        if not checkpoint_dirs:
+            print(f"ERROR: Nie znaleziono checkpointu w: {checkpoint_base_dir}")
+            print("Sprawdź, czy trening został ukończony i checkpoint został zapisany.")
+            print(f"Zawartość katalogu: {list(checkpoint_base_dir.iterdir())}")
+            return 1
+        # Użyj najnowszego checkpointu (największy numer)
+        checkpoint_dir = checkpoint_dirs[0]
+        print(f"Znaleziono checkpointy: {[d.name for d in checkpoint_dirs]}")
+        print(f"Używam najnowszego: {checkpoint_dir.name}")
+        print()
     test_en_path = Path(pick(args.test_en, get_nested(cfg, ["finetune_mt5", "test_en"]), "data/splits_random/test.en"))
     test_pl_path = Path(pick(args.test_pl, get_nested(cfg, ["finetune_mt5", "test_pl"]), "data/splits_random/test.pl"))
     output_hyp_path = Path(
@@ -94,12 +119,18 @@ def main() -> int:
     print(f"Liczba zdań: {len(test_en)}")
     print()
 
-    # Wczytaj model i tokenizer z checkpointu
+    # Wczytaj model i tokenizer
+    # Tokenizer z oryginalnego modelu (checkpoint nie zawiera tokenizera)
+    # Model z checkpointu (fine-tuned wagi)
+    model_name = str(get_nested(cfg, ["finetune_mt5", "model_name"]) or "google/mt5-small")
+    
+    print(f"Wczytywanie tokenizera z oryginalnego modelu: {model_name}...")
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    
     print(f"Wczytywanie modelu z checkpointu: {checkpoint_dir}...")
-    tokenizer = AutoTokenizer.from_pretrained(checkpoint_dir)
     model = AutoModelForSeq2SeqLM.from_pretrained(checkpoint_dir)
     model.eval()
-    print("Model wczytany.")
+    print("Model i tokenizer wczytane.")
     print()
 
     # Generowanie tłumaczeń

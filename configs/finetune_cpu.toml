@@ -36,8 +36,12 @@ output_dir = "outputs/finetuned/mt5_small"
 # Przy pełnym zbiorze (48656 par) i batch_size=2, effective_batch=16:
 # - kroki na epokę ≈ 48656/16 ≈ 3041 kroków
 # - eval_steps=250 oznacza ~12 ewaluacji na epokę (rozsądne)
+# - save_steps=250 oznacza ~12 checkpointów na epokę
+# - save_total_limit=3: automatycznie usuwa stare checkpointy, zostawia tylko 3 najnowsze
+#   (jeden checkpoint mT5-small ≈ 300-400 MB, więc 3 checkpointy ≈ 1-1.2 GB)
 eval_steps = 250  # Zmniejszone z 500 (częstsze zapisywanie checkpointów)
 save_steps = 250  # Zmniejszone z 500 (częstsze zapisywanie checkpointów)
+save_total_limit = 3  # Maksymalna liczba checkpointów (stare są automatycznie usuwane)
 logging_steps = 50  # co ile kroków logować loss (bez zmian)
 
 # Generowanie podczas ewaluacji

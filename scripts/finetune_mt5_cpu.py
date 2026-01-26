@@ -306,6 +306,7 @@ def main() -> int:
     output_dir = Path(pick(args.output_dir, get_nested(cfg, ["finetune_mt5", "output_dir"]), "outputs/finetuned/mt5_small_full"))
     eval_steps = int(pick(None, get_nested(cfg, ["finetune_mt5", "eval_steps"]), 500))
     save_steps = int(pick(None, get_nested(cfg, ["finetune_mt5", "save_steps"]), 500))
+    save_total_limit = int(pick(None, get_nested(cfg, ["finetune_mt5", "save_total_limit"]), 3))  # Domyślnie 3 checkpointy
     logging_steps = int(pick(None, get_nested(cfg, ["finetune_mt5", "logging_steps"]), 50))
 
     # QUICK MODE: nadpisz parametry
@@ -365,6 +366,8 @@ def main() -> int:
     print("=== FINE-TUNING mT5-small ===")
     if quick_mode:
         print("MODE: QUICK (smoke test)")
+    else:
+        print("MODE: FULL (pełny trening)")
     print(f"device: {device_str}" + (f" ({torch.cuda.get_device_name(0)})" if use_cuda else ""))
     print(f"model: {model_name}")
     print(f"src_lang: {src_lang} | tgt_lang: {tgt_lang}")
@@ -376,6 +379,7 @@ def main() -> int:
     else:
         print(f"lr: {learning_rate} | epochs: {num_epochs} | warmup_ratio: {warmup_ratio}")
     print(f"max_source_length: {max_source_length} | max_target_length: {max_target_length}")
+    print(f"save_steps: {save_steps} | save_total_limit: {save_total_limit} (automatyczne usuwanie starych checkpointów)")
     print(f"output_dir: {output_dir}")
     print()
 
@@ -415,6 +419,14 @@ def main() -> int:
     train_dataset = Dataset.from_list(train_data)
     val_dataset = Dataset.from_list(val_data)
     print(f"train: {len(train_dataset)} par | val: {len(val_dataset)} par")
+    
+    # Ostrzeżenie dla pełnego treningu na GPU bez --skip-eval-metrics
+    if use_cuda and not quick_mode and not args.skip_eval_metrics:
+        print()
+        print("WARNING: Pełny trening na GPU bez --skip-eval-metrics może powodować OOM podczas ewaluacji!")
+        print(f"   Zbiór walidacyjny: {len(val_dataset)} par (vs 200 w quick mode)")
+        print("   Zalecane: użyj --skip-eval-metrics i policz metryki później przez scripts/eval_finetuned.py")
+        print()
     print()
 
     # Wczytaj model i tokenizer
@@ -460,6 +472,7 @@ def main() -> int:
         "save_steps": save_steps,
         "eval_strategy": "steps",
         "save_strategy": "steps",
+        "save_total_limit": save_total_limit,  # Automatycznie usuwa stare checkpointy (oszczędza miejsce)
         "load_best_model_at_end": True,
         "metric_for_best_model": "eval_loss" if args.skip_eval_metrics else "bleu",  # Jeśli bez metryk, użyj loss
         "greater_is_better": False if args.skip_eval_metrics else True,  # Loss: mniejsze = lepsze
@@ -556,11 +569,19 @@ def main() -> int:
     with metrics_path.open("w", encoding="utf-8") as f:
         json.dump(final_metrics, f, indent=2, ensure_ascii=False)
 
+    # Helper do ładnego formatowania metryk, również gdy nie ma ich w słowniku
+    def _fmt_metric(val):
+        if isinstance(val, (int, float)):
+            return f"{val:.4f}"
+        if val is None:
+            return "N/A"
+        return str(val)
+
     print(f"\n=== PODSUMOWANIE ===")
-    print(f"train_loss: {final_metrics.get('train_loss', 'N/A'):.4f}")
-    print(f"eval_bleu: {final_metrics.get('eval_bleu', 'N/A'):.4f}")
+    print(f"train_loss: {_fmt_metric(final_metrics.get('train_loss'))}")
+    print(f"eval_bleu: {_fmt_metric(final_metrics.get('eval_bleu'))}")
     if "eval_chrf" in final_metrics:
-        print(f"eval_chrf: {final_metrics.get('eval_chrf', 'N/A'):.4f}")
+        print(f"eval_chrf: {_fmt_metric(final_metrics.get('eval_chrf'))}")
     print(f"train_runtime: {final_metrics.get('train_runtime', 0):.2f}s")
     print(f"Metryki zapisane do: {metrics_path}")
     print(f"Checkpoint zapisany do: {output_dir}")

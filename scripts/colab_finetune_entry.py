@@ -56,6 +56,9 @@ Przykłady użycia:
     
     # Podstawowe flagi - reszta jest przekazywana do finetune_mt5_cpu.py
     ap.add_argument("--quick", action="store_true", help="Quick mode (smoke test)")
+    ap.add_argument("--skip-eval-metrics", action="store_true",
+                    help="Pomiń metryki BLEU/chrF podczas ewaluacji w trakcie treningu (tylko loss). "
+                         "Zalecane na GPU, aby uniknąć OOM. Metryki można policzyć później przez eval_finetuned.py")
     ap.add_argument("--data-dir", type=Path, default=Path("data/splits_random"), 
                     help="Katalog z danymi (default: data/splits_random)")
     ap.add_argument("--output-dir", type=Path, default=None,
@@ -73,6 +76,8 @@ Przykłady użycia:
     finetune_args = []
     if args.quick:
         finetune_args.append("--quick")
+    if args.skip_eval_metrics:
+        finetune_args.append("--skip-eval-metrics")
     if args.data_dir:
         finetune_args.extend(["--data-dir", str(args.data_dir)])
     if args.output_dir:

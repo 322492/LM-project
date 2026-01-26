@@ -75,6 +75,12 @@ Lub bezpośrednio:
 
 ### Pełny trening
 
+**ZALECANE na GPU (aby uniknąć OOM):**
+```python
+!python scripts/colab_finetune_entry.py --epochs 1 --skip-eval-metrics
+```
+
+**Z metrykami podczas treningu (może być OOM na małych GPU):**
 ```python
 !python scripts/colab_finetune_entry.py --epochs 1
 ```
@@ -85,6 +91,7 @@ Lub z własnym katalogiem danych:
 !python scripts/colab_finetune_entry.py \
   --data-dir /content/drive/MyDrive/data/splits_random \
   --epochs 1 \
+  --skip-eval-metrics \
   --output-dir outputs/finetuned/mt5_small_full
 ```
 
@@ -92,6 +99,8 @@ Lub z własnym katalogiem danych:
 - Wszystkie dane (48656/3041 par train/val)
 - 1 epoka
 - Output: `outputs/finetuned/mt5_small_full/` (domyślnie)
+
+**UWAGA**: Pełny trening ma 15x więcej danych walidacyjnych (3041 vs 200), więc ryzyko OOM jest większe. Zalecane użycie `--skip-eval-metrics` na GPU. Metryki można policzyć później przez `scripts/eval_finetuned.py`.
 
 ### Zaawansowane opcje
 
@@ -216,3 +225,7 @@ print(os.getcwd())
 - Skrypt automatycznie używa GPU jeśli dostępne (`--device auto`)
 - Mixed precision (fp16) jest włączone automatycznie na GPU
 - Checkpointy są zapisywane co 250 kroków (można zmienić w configu)
+- **Automatyczne ograniczanie checkpointów**: `save_total_limit=3` (stare checkpointy są automatycznie usuwane)
+  - Jeden checkpoint mT5-small ≈ **300-400 MB**
+  - 3 checkpointy ≈ **1-1.2 GB** (zamiast potencjalnie 4-5 GB przy pełnym treningu)
+  - Colab ma ~15 GB dostępnego miejsca, więc to bezpieczne

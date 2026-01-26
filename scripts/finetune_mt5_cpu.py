@@ -266,6 +266,10 @@ def main() -> int:
     ap.add_argument("--batch-size", type=int, default=None, help="Batch size. (nadpisuje config)")
     ap.add_argument("--lr", type=float, default=None, help="Learning rate. (nadpisuje config)")
     ap.add_argument("--quick", action="store_true", help="Tryb szybki (smoke test): małe subsety, 150 kroków.")
+    ap.add_argument("--resume-from-checkpoint", type=str, default=None, 
+                    help="Ścieżka do checkpointu do wznowienia treningu (np. 'checkpoint-250' lub 'outputs/finetuned/mt5_small/checkpoint-250'). "
+                         "Jeśli None, trainer automatycznie wykryje ostatni checkpoint w output_dir (jeśli istnieje). "
+                         "Aby zacząć od nowa, usuń folder output_dir lub użyj innego output_dir.")
     args = ap.parse_args()
 
     cfg = load_toml(Path(args.config))
@@ -454,7 +458,39 @@ def main() -> int:
 
     # Trening
     print("Rozpoczynam trening...")
-    train_result = trainer.train()
+    
+    # Obsługa wznowienia z checkpointu
+    resume_from_checkpoint = args.resume_from_checkpoint
+    if resume_from_checkpoint is None:
+        # Automatyczne wykrywanie: jeśli w output_dir jest checkpoint, wznów z niego
+        if output_dir.exists():
+            checkpoint_dirs = sorted([d for d in output_dir.iterdir() if d.is_dir() and d.name.startswith("checkpoint-")], 
+                                      key=lambda x: int(x.name.split("-")[1]) if len(x.name.split("-")) > 1 and x.name.split("-")[1].isdigit() else 0, 
+                                      reverse=True)
+            if checkpoint_dirs:
+                resume_from_checkpoint = str(checkpoint_dirs[0])
+                print(f"Wykryto checkpoint: {resume_from_checkpoint}")
+                print("Trening zostanie wznowiony z tego checkpointu.")
+                print("(Aby zacząć od nowa, usuń folder output_dir lub użyj --resume-from-checkpoint '')")
+            else:
+                print("Brak checkpointów - rozpoczynam trening od początku.")
+        else:
+            print("Brak checkpointów (output_dir nie istnieje) - rozpoczynam trening od początku.")
+    elif resume_from_checkpoint == "":
+        # Pusty string = wymuszenie treningu od początku
+        resume_from_checkpoint = None
+        print("Wymuszono trening od początku (--resume-from-checkpoint='').")
+    else:
+        # Jawnie podana ścieżka
+        if not Path(resume_from_checkpoint).exists():
+            print(f"UWAGA: Checkpoint '{resume_from_checkpoint}' nie istnieje!")
+            print("Trening rozpocznie się od początku.")
+            resume_from_checkpoint = None
+        else:
+            print(f"Wznawiam trening z checkpointu: {resume_from_checkpoint}")
+    
+    print()
+    train_result = trainer.train(resume_from_checkpoint=resume_from_checkpoint)
     print("Trening zakończony.")
     print()
 

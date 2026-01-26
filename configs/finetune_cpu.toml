@@ -15,10 +15,14 @@ test_en = "data/splits_random/test.en"
 test_pl = "data/splits_random/test.pl"
 
 # Parametry treningu (CPU-friendly)
-max_source_length = 128
-max_target_length = 128
-batch_size = 2
-grad_accum_steps = 8  # efektywny batch = 2 * 8 = 16
+# UWAGA: Parametry zweryfikowane na podstawie doświadczeń z trybu --quick
+# Quick mode (2000/200/200 par) działał stabilnie z max_length=96
+# Pełny trening (48656/3041 par) wymaga bardziej konserwatywnych ustawień
+
+max_source_length = 96  # Zmniejszone z 128 (quick mode używał 96, działało stabilnie)
+max_target_length = 96  # Zmniejszone z 128 (quick mode używał 96, działało stabilnie)
+batch_size = 2  # Bez zmian (quick mode używał 2, działało stabilnie)
+grad_accum_steps = 8  # efektywny batch = 2 * 8 = 16 (bez zmian)
 learning_rate = 5.0e-5
 num_epochs = 1
 warmup_ratio = 0.03
@@ -28,10 +32,14 @@ seed = 2137
 output_dir = "outputs/finetuned/mt5_small"
 
 # Ewaluacja podczas treningu
-eval_steps = 500  # co ile kroków liczyć metryki na walidacji
-save_steps = 500  # co ile kroków zapisywać checkpoint
-logging_steps = 50  # co ile kroków logować loss
+# Zmniejszone z 500: częstsze zapisywanie checkpointów zmniejsza ryzyko utraty postępu
+# Przy pełnym zbiorze (48656 par) i batch_size=2, effective_batch=16:
+# - kroki na epokę ≈ 48656/16 ≈ 3041 kroków
+# - eval_steps=250 oznacza ~12 ewaluacji na epokę (rozsądne)
+eval_steps = 250  # Zmniejszone z 500 (częstsze zapisywanie checkpointów)
+save_steps = 250  # Zmniejszone z 500 (częstsze zapisywanie checkpointów)
+logging_steps = 50  # co ile kroków logować loss (bez zmian)
 
 # Generowanie podczas ewaluacji
 num_beams = 4
-max_new_tokens = 128
+max_new_tokens = 96  # Zmniejszone z 128 (zgodnie z max_target_length)

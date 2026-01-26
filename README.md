@@ -61,11 +61,12 @@ Nie istnieje publicznie dostępny model **OPUS-MT EN→PL** od **Helsinki-NLP**,
   - **multilingual** (obsługuje EN i PL),
   - **publicznie dostępny** na Hugging Face Hub.
 - **Konfiguracja**: `configs/finetune_cpu.toml`
-- **Parametry treningu** (CPU-friendly):
+- **Parametry treningu** (CPU-friendly, zweryfikowane na podstawie quick mode):
   - batch_size=2, gradient_accumulation_steps=8 (efektywny batch=16),
-  - max_source_length=128, max_target_length=128,
+  - max_source_length=96, max_target_length=96 (zmniejszone z 128 dla stabilności pamięciowej),
   - learning_rate=5e-5, num_epochs=1 (sanity + 1 epoka),
-  - warmup_ratio=0.03, seed=2137.
+  - warmup_ratio=0.03, seed=2137,
+  - eval_steps=250, save_steps=250 (częstsze zapisywanie checkpointów).
 - **Skrypty**:
   - `scripts/finetune_mt5_cpu.py` — trening z metrykami BLEU/chrF na walidacji, obsługuje tryb `--quick` (smoke test),
   - `scripts/eval_finetuned.py` — ewaluacja na zbiorze testowym (automatycznie znajduje najlepszy checkpoint).

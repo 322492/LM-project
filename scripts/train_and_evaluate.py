@@ -1,87 +1,155 @@
-"""
-UWAGA: Ten skrypt jest pomocniczy (trening + ewaluacja) i może być kosztowny na CPU.
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, Seq2SeqTrainer, Seq2SeqTrainingArguments
+from datasets import DatasetDict, Dataset
+from nltk.translate.bleu_score import sentence_bleu, corpus_bleu
+import nltk
 
-Zasada projektu: konfiguracja w jednym miejscu (configs/default.toml).
-Nie hardcodujemy nazw modeli ani ścieżek splitów.
+# Step 1: Load and Preprocess Data
+def load_translation_data():
+    def read_file(en_file, pl_file):
+        with open(en_file, 'r', encoding='utf-8') as f_en, open(pl_file, 'r', encoding='utf-8') as f_pl:
+            en_sentences = f_en.readlines()
+            pl_sentences = f_pl.readlines()
+        assert len(en_sentences) == len(pl_sentences), "Mismatched dataset sizes!"
+        return {"pl": pl_sentences, "en": en_sentences}
 
-Domyślny model: facebook/nllb-200-distilled-600M (NLLB, multilingual).
-Kierunek: EN -> PL (eng_Latn -> pol_Latn).
-"""
+    train = read_file("data/splits_random/train.pl", "data/splits_random/train.en")
+    val = read_file("data/splits_random/val.pl", "data/splits_random/val.en")
+    test = read_file("data/splits_random/test.pl", "data/splits_random/test.en")
 
-from __future__ import annotations
+    return DatasetDict({
+        "train": Dataset.from_dict(train),
+        "validation": Dataset.from_dict(val),
+        "test": Dataset.from_dict(test)
+    })
 
-import argparse
-from pathlib import Path
-from typing import List, Tuple
+data = load_translation_data()
 
-import torch
-from datasets import Dataset, DatasetDict
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+# Step 2: Load Pre-trained Tokenizer and Model
+model_name = "Helsinki-NLP/opus-mt-pl-en"
+#model_name = "distilbert-base-multilingual-cased"
 
-from config_utils import get_nested, load_toml, pick
+tokenizer = AutoTokenizer.from_pretrained(model_name)
 
+# Step 3: Tokenization Function
+def preprocess_function(examples):
+    # Tokenize the input sentences (Polish)
+    # print("Examples['pl']:", examples["pl"])
+    # print("Type of Examples['pl']:", type(examples["pl"]))
+    # print("Examples['en']:", examples["en"])
+    # print("Type of Examples['en']:", type(examples["en"]))
+    
+    inputs = list(examples["pl"])
+    targets = list(examples["en"])
 
-def read_parallel(en_path: Path, pl_path: Path) -> List[dict]:
-    en_lines = en_path.read_text(encoding="utf-8", errors="replace").splitlines()
-    pl_lines = pl_path.read_text(encoding="utf-8", errors="replace").splitlines()
-    if len(en_lines) != len(pl_lines):
-        raise ValueError(f"Mismatched dataset sizes: EN={len(en_lines)} PL={len(pl_lines)}")
-    # Ujednolicamy format: translation={en:..., pl:...}
-    return [{"translation": {"en": en.strip(), "pl": pl.strip()}} for en, pl in zip(en_lines, pl_lines)]
+    # Tokenize inputs and targets
+    model_inputs = tokenizer(inputs, max_length=512, truncation=True, padding="max_length")
+    with tokenizer.as_target_tokenizer():
+        labels = tokenizer(targets, max_length=512, truncation=True, padding="max_length")["input_ids"]
 
+    model_inputs["labels"] = labels
+    return model_inputs
 
-def nllb_forced_bos_id(tokenizer, tgt_lang: str) -> int:
-    forced = None
-    if hasattr(tokenizer, "lang_code_to_id") and getattr(tokenizer, "lang_code_to_id", None):
-        forced = tokenizer.lang_code_to_id.get(tgt_lang)
-    if forced is None:
-        forced = tokenizer.convert_tokens_to_ids(tgt_lang)
-    if forced is None or forced == tokenizer.unk_token_id:
-        raise ValueError(f"Nie udalo sie wyznaczyc forced_bos_token_id dla tgt_lang={tgt_lang!r}.")
-    return int(forced)
+# Tokenize the dataset
+# tokenized_data = DatasetDict({
+#         "train": preprocess_function(data['train']),
+#         "validation": preprocess_function(data['validation']),
+#         "test": preprocess_function(data['test'])
+#     })
 
+# Tokenize the dataset
+tokenized_data = data.map(preprocess_function, batched=True, remove_columns=["pl", "en"])
 
-def main() -> int:
-    ap = argparse.ArgumentParser(description="(WIP) Train + evaluate dla EN->PL (NLLB) z configa.")
-    ap.add_argument("--config", type=Path, default=Path("configs/default.toml"))
-    ap.add_argument("--model", type=str, default=None, help="Nazwa modelu (nadpisuje config)")
-    ap.add_argument("--src-lang", type=str, default=None, help="Kod src (nadpisuje config)")
-    ap.add_argument("--tgt-lang", type=str, default=None, help="Kod tgt (nadpisuje config)")
-    args = ap.parse_args()
+#
+print("Tokenized Dataset (Train) Example:")
+print(tokenized_data["train"][0])  # Inspect the first example in the train dataset
 
-    cfg = load_toml(Path(args.config))
-    model_name = str(pick(args.model, get_nested(cfg, ["baseline_nllb", "model_name"]), "facebook/nllb-200-distilled-600M"))
-    src_lang = str(pick(args.src_lang, get_nested(cfg, ["baseline_nllb", "src_lang"]), "eng_Latn"))
-    tgt_lang = str(pick(args.tgt_lang, get_nested(cfg, ["baseline_nllb", "tgt_lang"]), "pol_Latn"))
+#print("Keys in Dataset:", tokenized_data["train"].column_names)  # Check column names
+print("Keys in Dataset Features:", tokenized_data["train"].features.keys())
+#
 
-    train_en = Path(get_nested(cfg, ["paths", "splits_random_train_en"]))
-    train_pl = Path(get_nested(cfg, ["paths", "splits_random_train_pl"]))
-    val_en = Path(get_nested(cfg, ["paths", "splits_random_val_en"]))
-    val_pl = Path(get_nested(cfg, ["paths", "splits_random_val_pl"]))
-    test_en = Path(get_nested(cfg, ["paths", "splits_random_test_en"]))
-    test_pl = Path(get_nested(cfg, ["paths", "splits_random_test_pl"]))
+# Step 4: Define Training Arguments
+training_args = Seq2SeqTrainingArguments(
+    output_dir="./translation_model",
+    eval_strategy="epoch",
+    learning_rate=2e-5,
+    per_device_train_batch_size=16,
+    per_device_eval_batch_size=16,
+    num_train_epochs=3,
+    weight_decay=0.01,
+    save_total_limit=3,
+    predict_with_generate=True,
+    logging_dir="./logs"
+)
 
-    data = DatasetDict(
-        {
-            "train": Dataset.from_list(read_parallel(train_en, train_pl)),
-            "validation": Dataset.from_list(read_parallel(val_en, val_pl)),
-            "test": Dataset.from_list(read_parallel(test_en, test_pl)),
-        }
-    )
+# Step 5: Fine-Tune the Model
+model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+trainer = Seq2SeqTrainer(
+    model=model,
+    args=training_args,
+    train_dataset=tokenized_data["train"],
+    eval_dataset=tokenized_data["validation"],
+    tokenizer=tokenizer,
+)
 
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    if hasattr(tokenizer, "src_lang"):
-        tokenizer.src_lang = src_lang
-    forced_bos_token_id = nllb_forced_bos_id(tokenizer, tgt_lang=tgt_lang)
+# Uncomment the following line to fine-tune the model (time-consuming step).
+trainer.train()
 
-    # Szybka sanity informacja (bez trenowania)
-    print("=== TRAIN/EVAL (config-driven) ===")
-    print(f"model: {model_name}")
-    print(f"src_lang: {src_lang} | tgt_lang: {tgt_lang} | forced_bos_token_id: {forced_bos_token_id}")
-    print(f"sizes: train={len(data['train'])}, val={len(data['validation'])}, test={len(data['test'])}")
-    print("UWAGA: Ten skrypt nie trenuje automatycznie (trening pozostaje do dopracowania/uruchomienia osobno).")
-    return 0
+# Save the fine-tuned model
+trainer.save_model("./fine_tuned_model")
 
+# Step 6: BLEU Evaluation Function
+def compute_bleu(references, predictions):
+    """
+    Calculates BLEU score using NLTK's BLEU implementation.
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+    Args:
+        references: List of reference translations (list of lists of tokens).
+        predictions: List of predicted translations (list of tokens).
+
+    Returns:
+        The BLEU score for the corpus.
+    """
+    references_tokenized = [[ref.split()] for ref in references]
+    predictions_tokenized = [pred.split() for pred in predictions]
+    return corpus_bleu(references_tokenized, predictions_tokenized)
+
+# Step 7: Generate Translations for Test Set
+def generate_translations(model, tokenizer, test_data):
+    predictions = []
+    references = []
+    for example in test_data:
+        input_text = example["translation"]["pl"]
+        reference_text = example["translation"]["en"]
+        inputs = tokenizer(input_text, return_tensors="pt", truncation=True, max_length=512)
+        outputs = model.generate(**inputs)
+        prediction_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        predictions.append(prediction_text)
+        references.append(reference_text)
+    return references, predictions
+
+# Load Pre-trained Model Without Fine-Tuning
+pretrained_model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+
+# Load Fine-Tuned Model (If Fine-Tuning Is Complete)
+# fine_tuned_model = AutoModelForSeq2SeqLM.from_pretrained("./fine_tuned_model")
+
+# Generate Translations for Test Set Using Both Models
+references, pretrained_predictions = generate_translations(pretrained_model, tokenizer, data["test"])
+# _, fine_tuned_predictions = generate_translations(fine_tuned_model, tokenizer, data["test"])
+
+# Step 8: Calculate BLEU Scores
+pretrained_bleu = compute_bleu(references, pretrained_predictions)
+# fine_tuned_bleu = compute_bleu(references, fine_tuned_predictions)
+
+# Print Results
+print("BLEU Score for Pre-trained Model:", pretrained_bleu)
+# print("BLEU Score for Fine-Tuned Model:", fine_tuned_bleu)
+
+# Step 9: Print Example Translations
+print("\nExample Translations:")
+for i in range(3):
+    print(f"Polish: {data['test'][i]['translation']['pl']}")
+    print(f"Reference (English): {references[i]}")
+    print(f"Pre-trained Model Prediction: {pretrained_predictions[i]}")
+    # print(f"Fine-Tuned Model Prediction: {fine_tuned_predictions[i]}")
+    print()

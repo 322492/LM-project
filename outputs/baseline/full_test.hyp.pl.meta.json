@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-01-26T11:24:58",
+  "mode": "full",
+  "model": "facebook/nllb-200-distilled-600M",
+  "src_lang": "eng_Latn",
+  "tgt_lang": "pol_Latn",
+  "batch_size": 4,
+  "input_max_length": 256,
+  "max_new_tokens": 96,
+  "num_beams": 1,
+  "max_sentences": 0,
+  "sample": false,
+  "seed": 123,
+  "input_path": "data\\splits_random\\test.en",
+  "refs_full_path": "data\\splits_random\\test.pl",
+  "output_path": "outputs\\baseline\\full_test.hyp.pl",
+  "ref_subset_path": null,
+  "indices_path": null,
+  "lines_in_file": 9124,
+  "lines_selected": 9124,
+  "inference_time_s": 55296.4257658
+}

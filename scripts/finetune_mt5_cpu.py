@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Fine-tuning mT5-small na CPU dla tłumaczenia EN→PL (dane biblijne).
+Fine-tuning mT5-small dla tłumaczenia EN→PL (dane biblijne).
 
 Używa HuggingFace Seq2SeqTrainer z metrykami BLEU/chrF na walidacji.
-CPU-only, bez QLoRA/bitsandbytes.
+Działa na CPU i GPU (automatycznie wykrywa GPU jeśli dostępne).
 
 QUICK MODE (--quick):
   Tryb szybkiego sanity checku i debugowania pipeline'u.
@@ -258,31 +258,41 @@ def compute_metrics(eval_pred, tokenizer):
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Fine-tuning mT5-small EN->PL na CPU (dane biblijne).")
+    ap = argparse.ArgumentParser(description="Fine-tuning mT5-small EN->PL (dane biblijne). Działa na CPU i GPU.")
     ap.add_argument("--config", type=Path, default=Path("configs/finetune_cpu.toml"), help="Plik config TOML.")
     ap.add_argument("--model", type=str, default=None, help="Nazwa modelu. (nadpisuje config)")
-    ap.add_argument("--output-dir", type=Path, default=None, help="Katalog wyjściowy. (nadpisuje config)")
+    ap.add_argument("--data-dir", type=Path, default=Path("data/splits_random"), 
+                    help="Katalog z danymi: train.en/pl, val.en/pl, test.en/pl (default: data/splits_random)")
+    ap.add_argument("--output-dir", type=Path, default=None, 
+                    help="Katalog wyjściowy. (default: outputs/finetuned/mt5_small_full, nadpisuje config)")
+    ap.add_argument("--device", type=str, default="auto", choices=["cpu", "cuda", "auto"],
+                    help="Urządzenie: cpu, cuda, lub auto (automatycznie wykrywa GPU, default: auto)")
     ap.add_argument("--epochs", type=int, default=None, help="Liczba epok. (nadpisuje config)")
     ap.add_argument("--batch-size", type=int, default=None, help="Batch size. (nadpisuje config)")
     ap.add_argument("--lr", type=float, default=None, help="Learning rate. (nadpisuje config)")
     ap.add_argument("--quick", action="store_true", help="Tryb szybki (smoke test): małe subsety, 150 kroków.")
+    ap.add_argument("--skip-eval-metrics", action="store_true", 
+                    help="Pomiń metryki (BLEU/chrF) podczas ewaluacji w trakcie treningu (tylko loss). "
+                         "Pomaga uniknąć OOM na GPU. Metryki można policzyć później przez eval_finetuned.py.")
     ap.add_argument("--resume-from-checkpoint", type=str, default=None, 
                     help="Ścieżka do checkpointu do wznowienia treningu (np. 'checkpoint-250' lub 'outputs/finetuned/mt5_small/checkpoint-250'). "
                          "Jeśli None, trainer automatycznie wykryje ostatni checkpoint w output_dir (jeśli istnieje). "
                          "Aby zacząć od nowa, usuń folder output_dir lub użyj innego output_dir.")
     args = ap.parse_args()
 
-    cfg = load_toml(Path(args.config))
+    cfg = load_toml(Path(args.config)) if args.config.exists() else {}
 
     # Wczytaj parametry z configa
     model_name = str(pick(args.model, get_nested(cfg, ["finetune_mt5", "model_name"]), "google/mt5-small"))
     src_lang = str(get_nested(cfg, ["finetune_mt5", "src_lang"]) or "en")
     tgt_lang = str(get_nested(cfg, ["finetune_mt5", "tgt_lang"]) or "pl")
 
-    train_en = Path(pick(None, get_nested(cfg, ["finetune_mt5", "train_en"]), "data/splits_random/train.en"))
-    train_pl = Path(pick(None, get_nested(cfg, ["finetune_mt5", "train_pl"]), "data/splits_random/train.pl"))
-    val_en = Path(pick(None, get_nested(cfg, ["finetune_mt5", "val_en"]), "data/splits_random/val.en"))
-    val_pl = Path(pick(None, get_nested(cfg, ["finetune_mt5", "val_pl"]), "data/splits_random/val.pl"))
+    # Ścieżki do danych: --data-dir ma priorytet, potem config, potem default
+    data_dir = args.data_dir
+    train_en = Path(pick(None, get_nested(cfg, ["finetune_mt5", "train_en"]), str(data_dir / "train.en")))
+    train_pl = Path(pick(None, get_nested(cfg, ["finetune_mt5", "train_pl"]), str(data_dir / "train.pl")))
+    val_en = Path(pick(None, get_nested(cfg, ["finetune_mt5", "val_en"]), str(data_dir / "val.en")))
+    val_pl = Path(pick(None, get_nested(cfg, ["finetune_mt5", "val_pl"]), str(data_dir / "val.pl")))
 
     max_source_length = int(pick(None, get_nested(cfg, ["finetune_mt5", "max_source_length"]), 128))
     max_target_length = int(pick(None, get_nested(cfg, ["finetune_mt5", "max_target_length"]), 128))
@@ -293,7 +303,7 @@ def main() -> int:
     warmup_ratio = float(pick(None, get_nested(cfg, ["finetune_mt5", "warmup_ratio"]), 0.03))
     seed = int(pick(None, get_nested(cfg, ["finetune_mt5", "seed"]), 2137))
 
-    output_dir = Path(pick(args.output_dir, get_nested(cfg, ["finetune_mt5", "output_dir"]), "outputs/finetuned/mt5_small"))
+    output_dir = Path(pick(args.output_dir, get_nested(cfg, ["finetune_mt5", "output_dir"]), "outputs/finetuned/mt5_small_full"))
     eval_steps = int(pick(None, get_nested(cfg, ["finetune_mt5", "eval_steps"]), 500))
     save_steps = int(pick(None, get_nested(cfg, ["finetune_mt5", "save_steps"]), 500))
     logging_steps = int(pick(None, get_nested(cfg, ["finetune_mt5", "logging_steps"]), 50))
@@ -318,8 +328,8 @@ def main() -> int:
         grad_accum_steps = max(grad_accum_steps, 8)
         output_dir = Path("outputs/finetuned/mt5_small_quick")
         # Wczytaj też test set dla ewaluacji
-        test_en = Path(pick(None, get_nested(cfg, ["finetune_mt5", "test_en"]), "data/splits_random/test.en"))
-        test_pl = Path(pick(None, get_nested(cfg, ["finetune_mt5", "test_pl"]), "data/splits_random/test.pl"))
+        test_en = Path(pick(None, get_nested(cfg, ["finetune_mt5", "test_en"]), str(data_dir / "test.en")))
+        test_pl = Path(pick(None, get_nested(cfg, ["finetune_mt5", "test_pl"]), str(data_dir / "test.pl")))
     else:
         train_subset_size = None
         val_subset_size = None
@@ -328,19 +338,39 @@ def main() -> int:
         test_en = None
         test_pl = None
 
+    # Określ urządzenie (device)
+    if args.device == "auto":
+        use_cuda = torch.cuda.is_available()
+        device_str = "cuda" if use_cuda else "cpu"
+    else:
+        use_cuda = (args.device == "cuda")
+        device_str = args.device
+        if use_cuda and not torch.cuda.is_available():
+            print(f"UWAGA: --device=cuda wymagane, ale CUDA nie jest dostępne. Używam CPU.")
+            use_cuda = False
+            device_str = "cpu"
+    
+    device = torch.device(device_str)
+    
     # Seed dla powtarzalności
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
-    if torch.cuda.is_available():
+    if use_cuda:
         torch.cuda.manual_seed_all(seed)
 
-    print("=== FINE-TUNING mT5-small (CPU) ===")
+    # Oblicz eval_batch_size (może być mniejszy na GPU, aby uniknąć OOM)
+    eval_batch_size = batch_size if not use_cuda else max(1, batch_size // 2)
+    
+    print("=== FINE-TUNING mT5-small ===")
     if quick_mode:
         print("MODE: QUICK (smoke test)")
+    print(f"device: {device_str}" + (f" ({torch.cuda.get_device_name(0)})" if use_cuda else ""))
     print(f"model: {model_name}")
     print(f"src_lang: {src_lang} | tgt_lang: {tgt_lang}")
     print(f"batch_size: {batch_size} | grad_accum_steps: {grad_accum_steps} | effective_batch: {batch_size * grad_accum_steps}")
+    if use_cuda and eval_batch_size < batch_size:
+        print(f"eval_batch_size: {eval_batch_size} (zmniejszony dla GPU, aby uniknąć OOM)")
     if max_steps is not None:
         print(f"lr: {learning_rate} | max_steps: {max_steps} | warmup_ratio: {warmup_ratio}")
     else:
@@ -391,6 +421,7 @@ def main() -> int:
     print(f"Wczytywanie modelu i tokenizera: {model_name}...")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+    model = model.to(device)
 
     # Preprocessing
     print("Tokenizacja danych...")
@@ -416,10 +447,11 @@ def main() -> int:
     )
 
     # Training arguments
+    # UWAGA: eval_batch_size jest już obliczony wcześniej (może być mniejszy na GPU, aby uniknąć OOM)
     training_args_dict = {
         "output_dir": str(output_dir),
         "per_device_train_batch_size": batch_size,
-        "per_device_eval_batch_size": batch_size,
+        "per_device_eval_batch_size": eval_batch_size,  # Mniejszy batch dla ewaluacji (mniej pamięci)
         "gradient_accumulation_steps": grad_accum_steps,
         "learning_rate": learning_rate,
         "warmup_ratio": warmup_ratio,
@@ -429,12 +461,15 @@ def main() -> int:
         "eval_strategy": "steps",
         "save_strategy": "steps",
         "load_best_model_at_end": True,
-        "metric_for_best_model": "bleu",
-        "greater_is_better": True,
+        "metric_for_best_model": "eval_loss" if args.skip_eval_metrics else "bleu",  # Jeśli bez metryk, użyj loss
+        "greater_is_better": False if args.skip_eval_metrics else True,  # Loss: mniejsze = lepsze
         "seed": seed,
-        "fp16": False,  # CPU-only
-        "dataloader_num_workers": 0,  # CPU-friendly
+        "fp16": use_cuda,  # Mixed precision na GPU, wyłączone na CPU
+        "dataloader_num_workers": 0 if not use_cuda else 2,  # 0 dla CPU, 2 dla GPU
         "report_to": "none",  # bez wandb/tensorboard
+        "eval_accumulation_steps": 16 if use_cuda else 1,  # Na GPU: zbieraj predykcje w mniejszych krokach (mniej pamięci)
+        "prediction_loss_only": args.skip_eval_metrics,  # Jeśli bez metryk, tylko loss (mniej pamięci)
+        "predict_with_generate": not args.skip_eval_metrics,  # Generuj tylko jeśli potrzebujemy metryk
     }
     
     # QUICK MODE: użyj max_steps zamiast num_train_epochs
@@ -446,6 +481,15 @@ def main() -> int:
     training_args = Seq2SeqTrainingArguments(**training_args_dict)
 
     # Trainer
+    # UWAGA: compute_metrics może powodować OOM na GPU (zbiera wszystkie logits)
+    # Jeśli --skip-eval-metrics, używamy tylko loss podczas ewaluacji
+    compute_metrics_fn = None if args.skip_eval_metrics else (lambda eval_pred: compute_metrics(eval_pred, tokenizer))
+    
+    if args.skip_eval_metrics:
+        print("UWAGA: --skip-eval-metrics włączone - metryki BLEU/chrF będą pominięte podczas ewaluacji.")
+        print("Metryki można policzyć później przez: scripts/eval_finetuned.py")
+        print()
+    
     trainer = Seq2SeqTrainer(
         model=model,
         args=training_args,
@@ -453,7 +497,7 @@ def main() -> int:
         eval_dataset=val_dataset,
         data_collator=data_collator,
         tokenizer=tokenizer,
-        compute_metrics=lambda eval_pred: compute_metrics(eval_pred, tokenizer),
+        compute_metrics=compute_metrics_fn,
     )
 
     # Trening

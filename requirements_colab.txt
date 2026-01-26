@@ -1,0 +1,12 @@
+# Requirements dla Google Colab (z GPU support)
+# UWAGA: W Colab NIE używaj --extra-index-url dla CPU-only PyTorch
+# Colab ma już PyTorch z CUDA zainstalowany
+
+torch
+transformers>=4.40
+datasets
+sacrebleu
+sentencepiece
+accelerate
+evaluate
+protobuf

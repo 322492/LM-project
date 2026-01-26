@@ -45,6 +45,11 @@ Poniżej znajdują się wyłącznie decyzje już podjęte:
   - publicznie dostępny model,
   - dobra jakość tłumaczeń,
   - możliwość uruchomienia inference na CPU.
+- **Status**: 
+  - ✅ Inference zakończony na pełnym zbiorze testowym (9124 par)
+  - ✅ Ewaluacja zakończona: metryki w `outputs/baseline/full_test.metrics.txt`
+  - ✅ Skrypty: `scripts/run_baseline_inference.py`, `scripts/evaluate_baseline.py`
+  - ✅ Automatyczny pipeline: `scripts/run_full_baseline_and_eval.py`
 
 Nie istnieje publicznie dostępny model **OPUS-MT EN→PL** od **Helsinki-NLP**, dlatego jako baseline wybrano model multilingual (NLLB).
 
@@ -62,10 +67,21 @@ Nie istnieje publicznie dostępny model **OPUS-MT EN→PL** od **Helsinki-NLP**,
   - learning_rate=5e-5, num_epochs=1 (sanity + 1 epoka),
   - warmup_ratio=0.03, seed=2137.
 - **Skrypty**:
-  - `scripts/finetune_mt5_cpu.py` — trening z metrykami BLEU/chrF na walidacji,
-  - `scripts/eval_finetuned.py` — ewaluacja na zbiorze testowym.
+  - `scripts/finetune_mt5_cpu.py` — trening z metrykami BLEU/chrF na walidacji, obsługuje tryb `--quick` (smoke test),
+  - `scripts/eval_finetuned.py` — ewaluacja na zbiorze testowym (automatycznie znajduje najlepszy checkpoint).
+- **Status**: 
+  - ✅ Implementacja zakończona
+  - ✅ Tryb `--quick` działa (smoke test: małe subsety, 150 kroków)
+  - ✅ Ewaluacja automatyczna po treningu w trybie quick
+  - ⏳ Pełny trening (1 epoka na pełnym zbiorze) — do uruchomienia
 
 **Uwaga**: NLLB pozostaje jako **baseline inference** (bez fine-tuningu), mT5-small jest fine-tunowany na danych biblijnych.
+
+### Wyniki (quick mode - smoke test)
+- **Dane**: 2000/200/200 par (train/val/test), 150 kroków treningu
+- **Metryki na walidacji**: eval_loss=14.52, eval_bleu=0.0, eval_chrf=0.0
+- **Metryki na teście** (subset 200 par): BLEU=0.02, chrF=2.68
+- **Uwaga**: Niskie metryki są oczekiwane dla smoke testu (mały subset, krótki trening). Pełny trening powinien dać lepsze wyniki.
 
 ## Konfiguracja (config)
 - Centralny plik ustawień: `configs/default.toml` (ścieżki, seedy, parametry skryptów).

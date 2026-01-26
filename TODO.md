@@ -37,12 +37,12 @@ Poniższa lista jest podzielona na etapy. Elementy, których nie da się ustali�
 
 ## Model i trening (fine-tuning)
 - [x] Wybrać model bazowy (baseline) do tłumaczenia EN→PL: `facebook/nllb-200-distilled-600M` (NLLB, tylko inference).
-- [ ] Fine-tuning małego modelu (mT5-small) na CPU (sanity + 1 epoka):
-  - [ ] Konfiguracja: `configs/finetune_cpu.toml`
-  - [ ] Skrypt treningowy: `scripts/finetune_mt5_cpu.py`
-  - [ ] Skrypt ewaluacji: `scripts/eval_finetuned.py`
-  - [ ] Uruchomienie sanity run (mały wycinek danych)
-  - [ ] Uruchomienie pełnego treningu (1 epoka)
+- [x] Fine-tuning małego modelu (mT5-small) na CPU (sanity + 1 epoka):
+  - [x] Konfiguracja: `configs/finetune_cpu.toml`
+  - [x] Skrypt treningowy: `scripts/finetune_mt5_cpu.py` (z trybem `--quick` dla smoke testu)
+  - [x] Skrypt ewaluacji: `scripts/eval_finetuned.py` (automatyczne znajdowanie checkpointu)
+  - [x] Uruchomienie sanity run (tryb `--quick`: 2000/200/200 par, 150 kroków) — ✅ zakończone
+  - [ ] Uruchomienie pełnego treningu (1 epoka na pełnym zbiorze: 48656/3041 par)
 - [ ] Ustalić sposób tokenizacji/segmentacji zgodny z wybranym modelem (bez zmian „na ślepo”).
 - [ ] Przygotować pipeline treningowy:
   - [ ] konfiguracja hiperparametrów (learning rate, batch size, max length, liczba epok, warmup, itp.)
@@ -59,19 +59,20 @@ Poniższa lista jest podzielona na etapy. Elementy, których nie da się ustali�
 - [x] Zdefiniować metryki automatyczne: **BLEU i chrF** (sacrebleu).
 - [x] Ustalić baseline do porównania:
   - [x] **Baseline (NLLB)**: model bazowy **przed** fine-tuningiem (inference tylko)
-  - [ ] **Fine-tuned (mT5-small)**: model po fine-tuningu na danych biblijnych
+  - [x] **Fine-tuned (mT5-small)**: model po fine-tuningu na danych biblijnych (tryb quick: ✅ zakończony)
 - [x] Baseline inference (EN→PL) na zbiorze testowym: `outputs/baseline/full_test.hyp.pl`.
 - [x] Ewaluacja baseline (BLEU + opcjonalnie chrF): `outputs/baseline/full_test.metrics.txt`.
+- [x] Ewaluacja fine-tuned (quick mode) na subset testowy: `outputs/finetuned/mt5_small_quick/metrics.txt`.
 - [ ] Przeprowadzić ewaluację na:
-  - [ ] Biblia (test in-domain)
-  - [ ] Teksty współczesne (test out-of-domain)
-  - [ ] Teksty techniczne (test out-of-domain)
+  - [ ] Biblia (test in-domain) — pełny zbiór testowy (9124 par)
+  - [ ] Teksty współczesne (test out-of-domain) — wymaga przygotowania danych
+  - [ ] Teksty techniczne (test out-of-domain) — wymaga przygotowania danych
 - [ ] Test generalizacji: porównać wyniki Biblia (in-domain) vs teksty współczesne i techniczne (out-of-domain).
 - [ ] Zebrać wyniki w powtarzalnym formacie (tabelka + pliki wynikowe).
 - [ ] Przygotować próbkę jakościową (kilkanaście–kilkadziesiąt przykładów) do analizy błędów.
 
 ## Analiza wyników
-- [ ] Porównać baseline vs fine-tuned (po metrykach i na przykładach).
+- [ ] Porównać baseline vs fine-tuned (po metrykach i na przykładach) — wymaga pełnego treningu i ewaluacji.
 - [ ] Porównać: baseline vs po fine-tuningu (oddzielnie dla in-domain i out-of-domain).
 - [ ] Sprawdzić, czy fine-tuning poprawił Biblię kosztem degradacji na innych domenach (lub odwrotnie) – opisać wprost.
 - [ ] Przeprowadzić krótką analizę błędów:

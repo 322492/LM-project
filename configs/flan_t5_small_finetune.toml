@@ -1,0 +1,51 @@
+# Konfiguracja fine-tuningu na CPU (sentiment-polish-gpt2-small)
+# Model: sentiment-polish-gpt2-small
+
+[finetune_pgpt2]
+model_name = "nie3e/sentiment-polish-gpt2-small"
+src_lang = "en"
+tgt_lang = "pl"
+
+# Ścieżki do danych
+train_en = "data/splits_random/train.en"
+train_pl = "data/splits_random/train.pl"
+val_en = "data/splits_random/val.en"
+val_pl = "data/splits_random/val.pl"
+test_en = "data/splits_random/test.en"
+test_pl = "data/splits_random/test.pl"
+
+# Parametry treningu (CPU-friendly)
+# UWAGA: Parametry zweryfikowane na podstawie doświadczeń z trybu --quick
+# Quick mode (2000/200/200 par) działał stabilnie z max_length=96
+# Pełny trening (48656/3041 par) wymaga bardziej konserwatywnych ustawień
+
+max_source_length = 96  # Zmniejszone z 128 (quick mode używał 96, działało stabilnie)
+max_target_length = 96  # Zmniejszone z 128 (quick mode używał 96, działało stabilnie)
+batch_size = 2  # Bez zmian (quick mode używał 2, działało stabilnie)
+grad_accum_steps = 8  # efektywny batch = 2 * 8 = 16 (bez zmian)
+learning_rate = 5.0e-5
+num_epochs = 1
+warmup_ratio = 0.03
+seed = 2137
+
+# Katalog wyjściowy
+output_dir = "outputs/finetuned/polish_gpt2"
+
+# TODO: actualize
+# Ewaluacja podczas treningu
+# Zmniejszone z 500: częstsze zapisywanie checkpointów zmniejsza ryzyko utraty postępu
+# Przy pełnym zbiorze (48656 par) i batch_size=2, effective_batch=16:
+# - kroki na epokę ≈ 48656/16 ≈ 3041 kroków
+# - eval_steps=250 oznacza ~12 ewaluacji na epokę (rozsądne)
+# - save_steps=250 oznacza ~12 checkpointów na epokę
+# - save_total_limit=3: automatycznie usuwa stare checkpointy, zostawia tylko 3 najnowsze
+#   (jeden checkpoint mT5-small ≈ 300-400 MB, więc 3 checkpointy ≈ 1-1.2 GB)
+
+eval_steps = 250  # Zmniejszone z 500 (częstsze zapisywanie checkpointów)
+save_steps = 250  # Zmniejszone z 500 (częstsze zapisywanie checkpointów)
+save_total_limit = 3  # Maksymalna liczba checkpointów (stare są automatycznie usuwane)
+logging_steps = 50  # co ile kroków logować loss (bez zmian)
+
+# Generowanie podczas ewaluacji
+num_beams = 4
+max_new_tokens = 96  # Zmniejszone z 128 (zgodnie z max_target_length)

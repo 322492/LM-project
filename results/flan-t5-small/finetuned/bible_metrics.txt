@@ -1,0 +1,9 @@
+=== METRYKI FINE-TUNED google/flan-t5-small ===
+checkpoint: outputs\finetuned\flan_t5_small_full\checkpoint-3041
+test_en: data\splits_random\test.en
+test_pl: data\splits_random\test.pl
+output_hyp: outputs\finetuned\flan_t5_small_full\checkpoint-3041\bible_test.hyp.pl
+lines: 9124
+
+BLEU: BLEU = 1.70 20.6/3.9/0.6/0.2 (BP = 1.000 ratio = 1.004 hyp_len = 216306 ref_len = 215416)
+chrF: chrF2 = 15.82

@@ -1,0 +1,8 @@
+=== METRYKI BASELINE google/flan-t5-small ===
+test_en: data\evaluation_data\Theology.en
+test_pl: data\evaluation_data\Theology.pl
+output_hyp: outputs\finetuned\flan_t5_small_full\checkpoint-3041\Theology_test.hyp.pl
+lines: 258
+
+BLEU: BLEU = 0.09 12.9/0.0/0.0/0.0 (BP = 1.000 ratio = 1.177 hyp_len = 2092 ref_len = 1777)
+chrF: chrF2 = 12.06

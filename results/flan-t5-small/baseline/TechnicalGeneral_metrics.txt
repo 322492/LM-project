@@ -1,0 +1,8 @@
+=== METRYKI BASELINE google/flan-t5-small ===
+test_en: data\evaluation_data\TechnicalGeneral.en
+test_pl: data\evaluation_data\TechnicalGeneral.pl
+output_hyp: outputs\finetuned\flan_t5_small_full\checkpoint-3041\TechnicalGeneral_test.hyp.pl
+lines: 930
+
+BLEU: BLEU = 0.05 11.8/0.0/0.0/0.0 (BP = 1.000 ratio = 1.066 hyp_len = 7960 ref_len = 7468)
+chrF: chrF2 = 15.76

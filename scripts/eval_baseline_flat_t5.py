@@ -47,9 +47,8 @@ def compute_metrics(hyps: List[str], refs: List[str]) -> tuple[str, str | None]:
 
     return bleu_line, chrf_line
 
-def evaluate(checkpoint_dir, test_en_path, test_pl_path, output_hyp_path, batch_size, num_beams, max_new_tokens, output_metrics_path):
-    print("=== EWALUACJA FINE-TUNED google/flan-t5-small ===")
-    print(f"checkpoint: {checkpoint_dir}")
+def evaluate(test_en_path, test_pl_path, output_hyp_path, batch_size, num_beams, max_new_tokens, output_metrics_path):
+    print("=== EWALUACJA BASELINE google/flan-t5-small ===")
     print(f"test_en: {test_en_path}")
     print(f"test_pl: {test_pl_path}")
     print(f"output_hyp: {output_hyp_path}")
@@ -65,15 +64,15 @@ def evaluate(checkpoint_dir, test_en_path, test_pl_path, output_hyp_path, batch_
 
     # Wczytaj model i tokenizer
     # Tokenizer z oryginalnego modelu (checkpoint nie zawiera tokenizera)
-    # Model z checkpointu (fine-tuned wagi)
     model_name = "google/flan-t5-small"
     
     print(f"Wczytywanie tokenizera z oryginalnego modelu: {model_name}...")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     
-    print(f"Wczytywanie modelu z checkpointu: {checkpoint_dir}...")
-    model = AutoModelForSeq2SeqLM.from_pretrained(checkpoint_dir)
-    model.eval()
+    print(f"Wczytywanie modelu")
+    model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+    #model.eval()
+
     print("Model i tokenizer wczytane.")
     print()
 
@@ -130,8 +129,7 @@ def evaluate(checkpoint_dir, test_en_path, test_pl_path, output_hyp_path, batch_
     print()
 
     # Zapisz metryki
-    metrics_text = f"""=== METRYKI FINE-TUNED google/flan-t5-small ===
-checkpoint: {checkpoint_dir}
+    metrics_text = f"""=== METRYKI BASELINE google/flan-t5-small ===
 test_en: {test_en_path}
 test_pl: {test_pl_path}
 output_hyp: {output_hyp_path}

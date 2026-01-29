@@ -205,7 +205,7 @@ def main() -> int:
     output_metrics_path = Path(
         pick(args.output_metrics, None, checkpoint_dir / "bible_metrics.txt")
     )
-    evaluate(checkpoint_dir, test_en_path, test_pl_path, output_hyp_path, batch_size, num_beams, max_new_tokens, output_metrics_path)
+    evaluate(test_en_path, test_pl_path, output_hyp_path, batch_size, num_beams, max_new_tokens, output_metrics_path)
 
     # technical IT
     test_en_path = Path("data/evaluation_data/technicalIT.en")
@@ -217,7 +217,7 @@ def main() -> int:
     output_metrics_path = Path(
         pick(args.output_metrics, None, checkpoint_dir / "technicalIT_metrics.txt")
     )
-    evaluate(checkpoint_dir, test_en_path, test_pl_path, output_hyp_path, batch_size, num_beams, max_new_tokens, output_metrics_path)
+    evaluate(test_en_path, test_pl_path, output_hyp_path, batch_size, num_beams, max_new_tokens, output_metrics_path)
 
     # Theology
     test_en_path = Path("data/evaluation_data/Theology.en")
@@ -229,7 +229,7 @@ def main() -> int:
     output_metrics_path = Path(
         pick(args.output_metrics, None, checkpoint_dir / "Theology_metrics.txt")
     )
-    evaluate(checkpoint_dir, test_en_path, test_pl_path, output_hyp_path, batch_size, num_beams, max_new_tokens, output_metrics_path)
+    evaluate(test_en_path, test_pl_path, output_hyp_path, batch_size, num_beams, max_new_tokens, output_metrics_path)
 
     # TechnicalGeneral
     test_en_path = Path("data/evaluation_data/TechnicalGeneral.en")
@@ -241,7 +241,7 @@ def main() -> int:
     output_metrics_path = Path(
         pick(args.output_metrics, None, checkpoint_dir / "TechnicalGeneral_metrics.txt")
     )
-    evaluate(checkpoint_dir, test_en_path, test_pl_path, output_hyp_path, batch_size, num_beams, max_new_tokens, output_metrics_path)
+    evaluate(test_en_path, test_pl_path, output_hyp_path, batch_size, num_beams, max_new_tokens, output_metrics_path)
 
 
     # Contemporary
@@ -254,7 +254,7 @@ def main() -> int:
     output_metrics_path = Path(
         pick(args.output_metrics, None, checkpoint_dir / "Contemporary_metrics.txt")
     )
-    evaluate(checkpoint_dir, test_en_path, test_pl_path, output_hyp_path, batch_size, num_beams, max_new_tokens, output_metrics_path)
+    evaluate(test_en_path, test_pl_path, output_hyp_path, batch_size, num_beams, max_new_tokens, output_metrics_path)
 
 
     return 0

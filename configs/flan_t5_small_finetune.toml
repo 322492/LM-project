@@ -1,8 +1,8 @@
-# Konfiguracja fine-tuningu na CPU (sentiment-polish-gpt2-small)
-# Model: sentiment-polish-gpt2-small
+# Konfiguracja fine-tuningu na CPU (google/flan-t5-small)
+# Model: google/flan-t5-small
 
-[finetune_pgpt2]
-model_name = "nie3e/sentiment-polish-gpt2-small"
+[finetune_flat_t5]
+model_name = "google/flan-t5-small"
 src_lang = "en"
 tgt_lang = "pl"
 
@@ -29,7 +29,7 @@ warmup_ratio = 0.03
 seed = 2137
 
 # Katalog wyjściowy
-output_dir = "outputs/finetuned/polish_gpt2"
+output_dir = "outputs/finetuned/flan_t5"
 
 # TODO: actualize
 # Ewaluacja podczas treningu

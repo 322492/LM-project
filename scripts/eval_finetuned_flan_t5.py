@@ -47,63 +47,7 @@ def compute_metrics(hyps: List[str], refs: List[str]) -> tuple[str, str | None]:
 
     return bleu_line, chrf_line
 
-
-def main() -> int:
-    ap = argparse.ArgumentParser(description="Ewaluacja fine-tuned google/flan-t5-small EN->PL.")
-    ap.add_argument("--config", type=Path, default=Path("configs/finetune_cpu.toml"), help="Plik config TOML.")
-    ap.add_argument("--checkpoint", type=Path, default=None, help="Ścieżka do checkpointu. (nadpisuje config)")
-    ap.add_argument("--test-en", type=Path, default=None, help="Plik test.en. (nadpisuje config)")
-    ap.add_argument("--test-pl", type=Path, default=None, help="Plik test.pl (referencje). (nadpisuje config)")
-    ap.add_argument("--output-hyp", type=Path, default=None, help="Plik wyjściowy z hipotezami. (nadpisuje config)")
-    ap.add_argument("--output-metrics", type=Path, default=None, help="Plik wyjściowy z metrykami. (nadpisuje config)")
-    ap.add_argument("--batch-size", type=int, default=None, help="Batch size dla generowania. (nadpisuje config)")
-    ap.add_argument("--num-beams", type=int, default=None, help="Liczba beamów. (nadpisuje config)")
-    ap.add_argument("--max-new-tokens", type=int, default=None, help="Max nowych tokenów. (nadpisuje config)")
-    args = ap.parse_args()
-
-    cfg = load_toml(Path(args.config))
-
-    # Wczytaj parametry
-    checkpoint_base_dir = Path(
-        pick(args.checkpoint, get_nested(cfg, ["finetune_flat_t5", "output_dir"]), "outputs/finetuned/flan_t5_small_quick")
-    )
-    
-    # Sprawdź, czy katalog istnieje
-    if not checkpoint_base_dir.exists():
-        print(f"ERROR: Katalog checkpointu nie istnieje: {checkpoint_base_dir}")
-        print("Sprawdź, czy trening został ukończony i checkpoint został zapisany.")
-        return 1
-    
-    # Sprawdź, czy w katalogu jest bezpośrednio model.safetensors (finalny checkpoint)
-    # lub są podkatalogi checkpoint-*
-    if (checkpoint_base_dir / "model.safetensors").exists() or (checkpoint_base_dir / "pytorch_model.bin").exists():
-        # Finalny checkpoint w głównym katalogu
-        checkpoint_dir = checkpoint_base_dir
-    else:
-        # Szukaj checkpoint-* podkatalogów
-        checkpoint_dirs = sorted(checkpoint_base_dir.glob("checkpoint-*"), key=lambda x: int(x.name.split("-")[-1]), reverse=True)
-        if not checkpoint_dirs:
-            print(f"ERROR: Nie znaleziono checkpointu w: {checkpoint_base_dir}")
-            print("Sprawdź, czy trening został ukończony i checkpoint został zapisany.")
-            print(f"Zawartość katalogu: {list(checkpoint_base_dir.iterdir())}")
-            return 1
-        # Użyj najnowszego checkpointu (największy numer)
-        checkpoint_dir = checkpoint_dirs[0]
-        print(f"Znaleziono checkpointy: {[d.name for d in checkpoint_dirs]}")
-        print(f"Używam najnowszego: {checkpoint_dir.name}")
-        print()
-    test_en_path = Path(pick(args.test_en, get_nested(cfg, ["finetune_flat_t5", "test_en"]), "data/splits_random/test.en"))
-    test_pl_path = Path(pick(args.test_pl, get_nested(cfg, ["finetune_flat_t5", "test_pl"]), "data/splits_random/test.pl"))
-    output_hyp_path = Path(
-        pick(args.output_hyp, None, checkpoint_dir / "test.hyp.pl")
-    )
-    output_metrics_path = Path(
-        pick(args.output_metrics, None, checkpoint_dir / "metrics.txt")
-    )
-    batch_size = int(pick(args.batch_size, get_nested(cfg, ["finetune_flat_t5", "batch_size"]), 2))
-    num_beams = int(pick(args.num_beams, get_nested(cfg, ["finetune_flat_t5", "num_beams"]), 4))
-    max_new_tokens = int(pick(args.max_new_tokens, get_nested(cfg, ["finetune_flat_t5", "max_new_tokens"]), 128))
-
+def evaluate(checkpoint_dir, test_en_path, test_pl_path, output_hyp_path, batch_size, num_beams, max_new_tokens, output_metrics_path):
     print("=== EWALUACJA FINE-TUNED google/flan-t5-small ===")
     print(f"checkpoint: {checkpoint_dir}")
     print(f"test_en: {test_en_path}")
@@ -201,6 +145,119 @@ chrF: {chrf_line if chrf_line else "(niedostępne)"}
 
     print(metrics_text)
     print(f"Metryki zapisane do: {output_metrics_path}")
+
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Ewaluacja fine-tuned google/flan-t5-small EN->PL.")
+    ap.add_argument("--config", type=Path, default=Path("configs/finetune_cpu.toml"), help="Plik config TOML.")
+    ap.add_argument("--checkpoint", type=Path, default=None, help="Ścieżka do checkpointu. (nadpisuje config)")
+    ap.add_argument("--test-en", type=Path, default=None, help="Plik test.en. (nadpisuje config)")
+    ap.add_argument("--test-pl", type=Path, default=None, help="Plik test.pl (referencje). (nadpisuje config)")
+    ap.add_argument("--output-hyp", type=Path, default=None, help="Plik wyjściowy z hipotezami. (nadpisuje config)")
+    ap.add_argument("--output-metrics", type=Path, default=None, help="Plik wyjściowy z metrykami. (nadpisuje config)")
+    ap.add_argument("--batch-size", type=int, default=None, help="Batch size dla generowania. (nadpisuje config)")
+    ap.add_argument("--num-beams", type=int, default=None, help="Liczba beamów. (nadpisuje config)")
+    ap.add_argument("--max-new-tokens", type=int, default=None, help="Max nowych tokenów. (nadpisuje config)")
+    args = ap.parse_args()
+
+    cfg = load_toml(Path(args.config))
+
+    # Wczytaj parametry
+    checkpoint_base_dir = Path(
+        pick(args.checkpoint, get_nested(cfg, ["finetune_flat_t5", "output_dir"]), "outputs/finetuned/flan_t5_small_full")
+    )
+    
+    # Sprawdź, czy katalog istnieje
+    if not checkpoint_base_dir.exists():
+        print(f"ERROR: Katalog checkpointu nie istnieje: {checkpoint_base_dir}")
+        print("Sprawdź, czy trening został ukończony i checkpoint został zapisany.")
+        return 1
+    
+    # Sprawdź, czy w katalogu jest bezpośrednio model.safetensors (finalny checkpoint)
+    # lub są podkatalogi checkpoint-*
+    if (checkpoint_base_dir / "model.safetensors").exists() or (checkpoint_base_dir / "pytorch_model.bin").exists():
+        # Finalny checkpoint w głównym katalogu
+        checkpoint_dir = checkpoint_base_dir
+    else:
+        # Szukaj checkpoint-* podkatalogów
+        checkpoint_dirs = sorted(checkpoint_base_dir.glob("checkpoint-*"), key=lambda x: int(x.name.split("-")[-1]), reverse=True)
+        if not checkpoint_dirs:
+            print(f"ERROR: Nie znaleziono checkpointu w: {checkpoint_base_dir}")
+            print("Sprawdź, czy trening został ukończony i checkpoint został zapisany.")
+            print(f"Zawartość katalogu: {list(checkpoint_base_dir.iterdir())}")
+            return 1
+        # Użyj najnowszego checkpointu (największy numer)
+        checkpoint_dir = checkpoint_dirs[0]
+        print(f"Znaleziono checkpointy: {[d.name for d in checkpoint_dirs]}")
+        print(f"Używam najnowszego: {checkpoint_dir.name}")
+        print()
+
+    batch_size = int(pick(args.batch_size, get_nested(cfg, ["finetune_flat_t5", "batch_size"]), 2))
+    num_beams = int(pick(args.num_beams, get_nested(cfg, ["finetune_flat_t5", "num_beams"]), 4))
+    max_new_tokens = int(pick(args.max_new_tokens, get_nested(cfg, ["finetune_flat_t5", "max_new_tokens"]), 128))
+
+    # BIBLE
+    test_en_path = Path(pick(args.test_en, get_nested(cfg, ["finetune_flat_t5", "test_en"]), "data/splits_random/test.en"))
+    test_pl_path = Path(pick(args.test_pl, get_nested(cfg, ["finetune_flat_t5", "test_pl"]), "data/splits_random/test.pl"))
+
+    output_hyp_path = Path(
+        pick(args.output_hyp, None, checkpoint_dir / "bible_test.hyp.pl")
+    )
+    output_metrics_path = Path(
+        pick(args.output_metrics, None, checkpoint_dir / "bible_metrics.txt")
+    )
+    evaluate(checkpoint_dir, test_en_path, test_pl_path, output_hyp_path, batch_size, num_beams, max_new_tokens, output_metrics_path)
+
+    # technical IT
+    test_en_path = Path("data/evaluation_data/technicalIT.en")
+    test_pl_path = Path("data/evaluation_data/technicalIT.pl")
+
+    output_hyp_path = Path(
+        pick(args.output_hyp, None, checkpoint_dir / "technicalIT_test.hyp.pl")
+    )
+    output_metrics_path = Path(
+        pick(args.output_metrics, None, checkpoint_dir / "technicalIT_metrics.txt")
+    )
+    evaluate(checkpoint_dir, test_en_path, test_pl_path, output_hyp_path, batch_size, num_beams, max_new_tokens, output_metrics_path)
+
+    # Theology
+    test_en_path = Path("data/evaluation_data/Theology.en")
+    test_pl_path = Path("data/evaluation_data/Theology.pl")
+
+    output_hyp_path = Path(
+        pick(args.output_hyp, None, checkpoint_dir / "Theology_test.hyp.pl")
+    )
+    output_metrics_path = Path(
+        pick(args.output_metrics, None, checkpoint_dir / "Theology_metrics.txt")
+    )
+    evaluate(checkpoint_dir, test_en_path, test_pl_path, output_hyp_path, batch_size, num_beams, max_new_tokens, output_metrics_path)
+
+    # TechnicalGeneral
+    test_en_path = Path("data/evaluation_data/TechnicalGeneral.en")
+    test_pl_path = Path("data/evaluation_data/TechnicalGeneral.pl")
+
+    output_hyp_path = Path(
+        pick(args.output_hyp, None, checkpoint_dir / "TechnicalGeneral_test.hyp.pl")
+    )
+    output_metrics_path = Path(
+        pick(args.output_metrics, None, checkpoint_dir / "TechnicalGeneral_metrics.txt")
+    )
+    evaluate(checkpoint_dir, test_en_path, test_pl_path, output_hyp_path, batch_size, num_beams, max_new_tokens, output_metrics_path)
+
+
+    # Contemporary
+    test_en_path = Path("data/evaluation_data/Contemporary.en")
+    test_pl_path = Path("data/evaluation_data/Contemporary.pl")
+
+    output_hyp_path = Path(
+        pick(args.output_hyp, None, checkpoint_dir / "Contemporary_test.hyp.pl")
+    )
+    output_metrics_path = Path(
+        pick(args.output_metrics, None, checkpoint_dir / "Contemporary_metrics.txt")
+    )
+    evaluate(checkpoint_dir, test_en_path, test_pl_path, output_hyp_path, batch_size, num_beams, max_new_tokens, output_metrics_path)
+
 
     return 0
 

@@ -71,19 +71,17 @@ Nie istnieje publicznie dostępny model **OPUS-MT EN→PL** od **Helsinki-NLP**,
 - **Skrypty**:
   - `scripts/finetune_mt5_cpu.py` — trening z metrykami BLEU/chrF na walidacji, obsługuje tryb `--quick` (smoke test),
   - `scripts/eval_finetuned.py` — ewaluacja na zbiorze testowym (automatycznie znajduje najlepszy checkpoint).
-- **Status**: 
-  - ✅ Implementacja zakończona
-  - ✅ Tryb `--quick` działa (smoke test: małe subsety, 150 kroków)
-  - ✅ Ewaluacja automatyczna po treningu w trybie quick
-  - ⏳ Pełny trening (1 epoka na pełnym zbiorze) — do uruchomienia
+- **Status**: implementacja zakończona; tryb `--quick` (smoke test) i ewaluacja działają. Pełny trening (1 epoka na pełnym zbiorze) pozostaje opcjonalny.
 
-**Uwaga**: NLLB pozostaje jako **baseline inference** (bez fine-tuningu), mT5-small jest fine-tunowany na danych biblijnych.
+**Uwaga**: NLLB = baseline inference (bez fine-tuningu). mT5-small = model do fine-tuningu na danych biblijnych (quick run zrealizowany).
 
-### Wyniki (quick mode - smoke test)
-- **Dane**: 2000/200/200 par (train/val/test), 150 kroków treningu
-- **Metryki na walidacji**: eval_loss=14.52, eval_bleu=0.0, eval_chrf=0.0
-- **Metryki na teście** (subset 200 par): BLEU=0.02, chrF=2.68
-- **Uwaga**: Niskie metryki są oczekiwane dla smoke testu (mały subset, krótki trening). Pełny trening powinien dać lepsze wyniki.
+### mT5-small – wyniki quick mode (smoke test)
+- Dane: 2000/200/200 par (train/val/test), 150 kroków. Metryki na teście (subset 200 par): BLEU=0.02, chrF=2.68.
+
+## Flan-T5-small (eksperyment główny – zakończony)
+- **Model**: `google/flan-t5-small` (fine-tuning 1 epoka na danych biblijnych).
+- **Skrypty**: `scripts/finetune_flan_t5_cpu.py`, `scripts/eval_finetuned_flan_t5.py` (ewaluacja fine-tuned), `scripts/eval_baseline_flat_t5.py` (baseline zero-shot: ten sam model bez fine-tuningu, `--output-dir results/flan-t5-small/baseline`).
+- **Wyniki**: `results/flan-t5-small/baseline/` i `results/flan-t5-small/finetuned/` — BLEU/chrF na Bible (in-domain) oraz Contemporary, TechnicalGeneral, technicalIT, Theology (OOD).
 
 ## Konfiguracja (config)
 - Centralny plik ustawień: `configs/default.toml` (ścieżki, seedy, parametry skryptów).
@@ -91,21 +89,13 @@ Nie istnieje publicznie dostępny model **OPUS-MT EN→PL** od **Helsinki-NLP**,
 - Wspólny helper do wczytywania configa: `scripts/config_utils.py`.
 
 ## Out-of-domain test sets
-Projekt przewiduje **2 zbiory testowe out-of-domain** do ewaluacji generalizacji:
+Projekt przewiduje zbiory testowe out-of-domain do ewaluacji generalizacji. Używane są:
+- **data/evaluation_data/** — Contemporary, TechnicalGeneral, technicalIT, Theology (EN/PL, gotowe do ewaluacji).
+- **data/ood/** — placeholdery (contemporary, technical); szczegóły w [`data/ood/README.md`](data/ood/README.md). Szablon: `python scripts/ood_template_builder.py`.
 
-1. **Contemporary** (teksty współczesne): `data/ood/contemporary.{en,pl}`
-   - Docelowo: 200-500 par z tekstów współczesnych (news, blogi, literatura współczesna).
-2. **Technical** (teksty techniczne): `data/ood/technical.{en,pl}`
-   - Docelowo: 200-500 par z tekstów technicznych (dokumentacja IT, artykuły naukowe, instrukcje).
+## Wyniki i prezentacja
+- **results/flan-t5-small/** — wyniki Flan-T5-small: `baseline/` (zero-shot) i `finetuned/` (checkpoint-3041) na Bible + OOD.
+- **results/Comparison.xlsx** — zestawienie BLEU/chrF (baseline vs fine-tuned).
+- **results/ResultPresentation.pptx** — prezentacja wyników projektu.
 
-**Status:** ⚠️ Na razie są to **placeholdery** — wymagają uzupełnienia źródłem danych i licencją.
-
-Szczegóły i checklista do uzupełnienia: **[`data/ood/README.md`](data/ood/README.md)**
-
-Aby wygenerować szablon dokumentacji:
-```bash
-python scripts/ood_template_builder.py
-```
-
-## TODO (checklista)
-Szczegółowa checklista projektu jest w pliku: **[`TODO.md`](TODO.md)**.
+Szczegółowa checklista (stan projektu): **[`TODO.md`](TODO.md)**.

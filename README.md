@@ -93,9 +93,77 @@ Projekt przewiduje zbiory testowe out-of-domain do ewaluacji generalizacji. Uży
 - **data/evaluation_data/** — Contemporary, TechnicalGeneral, technicalIT, Theology (EN/PL, gotowe do ewaluacji).
 - **data/ood/** — placeholdery (contemporary, technical); szczegóły w [`data/ood/README.md`](data/ood/README.md). Szablon: `python scripts/ood_template_builder.py`.
 
+## Results
+
+| Model | Train domain | Test domain | BLEU | chrF |
+|-------|--------------|-------------|------|------|
+| NLLB (baseline) | general | Bible (in-domain) | 10.62 | 37.69 |
+| NLLB (baseline) | general | OOD | — | — |
+| Flan-T5-small (baseline) | general | Bible (in-domain) | 0.07 | 12.29 |
+| Flan-T5-small (baseline) | general | OOD (śr. 4 zbiorów) | 0.33 | 13.16 |
+| Flan-T5-small (finetuned) | Bible | Bible (in-domain) | 1.70 | 15.82 |
+| Flan-T5-small (finetuned) | Bible | OOD (śr. 4 zbiorów) | 0.28 | 8.26 |
+| mT5-small (finetuned) | Bible | Bible (subset 200) | 0.02 | 2.68 |
+| mT5-small (finetuned) | Bible | OOD | — | — |
+
+Źródło: `outputs/baseline/full_test.metrics.txt`, `results/flan-t5-small/{baseline,finetuned}/*_metrics.txt`, `outputs/finetuned/mt5_small_quick/metrics.txt`. OOD = Contemporary, TechnicalGeneral, technicalIT, Theology.
+
+**Interpretacja:** Fine-tuning na domenie biblijnej wyraźnie poprawia wyniki **in-domain** (Flan-T5: BLEU 0.07→1.70, chrF 12.29→15.82 na Bible). Na zbiorach **out-of-domain** jakość się pogarsza (chrF 13.16→8.26) — model dostosowuje się do stylu treningu i traci na generalizacji. To typowy efekt domenowy: zysk in-domain kosztem OOD.
+
+## Qualitative examples
+
+Przykłady z testu biblijnego (in-domain). Źródło: `data/splits_random/test.{en,pl}`, baseline: `outputs/baseline/full_test.hyp.pl` (NLLB), finetuned: `results/flan-t5-small/finetuned/bible_test.hyp.pl` (Flan-T5-small).
+
+**Przykład 1 (linia 0)**  
+EN: *Behold also the ships, which though they be so great, and are driven of fierce winds, yet are they turned about with a very small helm, whithersoever the governor listeth.*  
+REF (PL): Oto i okręty, choć tak wielkie są i tęgiemi wiatrami pędzone bywają, wszak i najmniejszym sterem bywają kierowane, gdziekolwiek jest wola sternikowa;  
+BASELINE (PL): Zobaczcie też statki, które, choć są wielkie i prowadzone przez gwałtowny wiatr, przemieszczają się z bardzo małym kierownicą, gdzie chce rządca.  
+FINETUNED (PL): A tak wszystkich wszystkich, którzy wszystkich jest swoich… (powtórzenia leksykalne)  
+Komentarz: Baseline (NLLB) daje płynne PL; finetuned (Flan-T5) produkuje PL w stylu biblijnym z powtórzeniami.
+
+**Przykład 2 (linia 2)**  
+EN: *In those days Hezekiah was sick even to death: and he prayed to Yahweh; and he spoke to him, and gave him a sign.*  
+REF (PL): I sprzysięgli się przeciw niemu słudzy jego, i zabili go w domu jego.  
+BASELINE (PL): W tych dniach Chryzek chory był aż do śmierci, i modlił się do Pana, a On z nim rozmawiał i dał mu znak.  
+FINETUNED (PL): A tak dnia dnia Hezekijasz od wity… (powtórzenia, skróty)  
+Komentarz: Różnica w stylu (współczesny vs archaiczny) i w stabilności formy.
+
+**Przykład 3 (linia 4)**  
+EN: *I have given you every place that the sole of your foot will tread on, as I told Moses.*  
+REF (PL): Każde miejsce, po którem deptać będzie stopa nogi waszej, dałem wam, jakom obiecał Mojżeszowi.  
+BASELINE (PL): Dałem wam wszelkie miejsce, na które będzie szło pod nogą waszą, jak obiecałem Mojżeszowi.  
+FINETUNED (PL): Przeto wszystko nad wszystkiego, którzy wszystko sug sug… (artefakty powtórzeń)  
+Komentarz: Finetuned przejmuje archaiczny szyk i słownictwo, z wyraźnymi powtórzeniami.
+
+**Przykład 4 (linia 9)**  
+EN: *And it came to pass, when men began to multiply on the face of the earth, and daughters were born unto them,*  
+REF (PL): I stało się, gdy się ludzie poczęli rozmnażać na ziemi, a córki się im zrodziły;  
+BASELINE (PL): A gdy ludzie zaczęli się liczyć na powierzchni ziemi i urodziły się im córki,  
+FINETUNED (PL): A odpowiedzia si, gdy mówi w ziemi ziemi ziemi, i suy suy na ziemi.  
+Komentarz: Finetuned powtarza fragmenty (ziemia, odpowiedzia) w stylu zbliżonym do treningu.
+
+**OOD (Contemporary, linie 0 i 5)**  
+EN: *That'll do, Donkey. That'll do.* / *The cake is a lie.*  
+REF (PL): Wystarczy, osiołku. Wystarczy. / Ciasto to kłamstwo.  
+BASELINE (Flan-T5, PL): Donkey. Do not try. / The cake is a lie. (często pozostaje w EN lub krótkie frazy)  
+FINETUNED (Flan-T5, PL): Przeto wszystkiego… / Jeli jest te sowa. (formy biblijne, powtórzenia)  
+Komentarz: Na OOD baseline (zero-shot) częściej zostaje przy EN lub krótkich frazach; finetuned przenosi styl biblijny i archaiczne formy na tekst współczesny.
+
+## Limitations
+
+- **Budżet obliczeniowy:** Trening i ewaluacja na CPU lub Colab (GPU z limitem czasu); brak systematycznego przeszukiwania konfiguracji.
+- **Rozmiar modelu:** Fine-tuning małych modeli (Flan-T5-small, mT5-small); NLLB baseline jest większy i daje wyższe BLEU/chrF na Bible (tabela Results).
+- **Długość treningu:** Jedna epoka na danych biblijnych; brak early stopping ani wieloepokowej optymalizacji.
+- **Hiperparametry:** Użyte ustawienia z configu (lr, batch, max_length) bez grid search ani walidacji na osobnym dev set; wyniki są reprezentatywne dla tej konfiguracji, nie dla optimum.
+
+## Conclusions
+
+Fine-tuning na korpusie biblijnym **zwiększa wyniki in-domain** (Flan-T5: BLEU i chrF na Bible rosną względem baseline zero-shot) i **obniża wyniki out-of-domain** (chrF na OOD spada). To potwierdza **trade-off specjalizacja vs generalizacja**: model lepiej naśladuje domenę treningu kosztem zdolności do innych typów tekstu. W ramach tego eksperymentu nie rozstrzygamy, czy model uczy się ogólnych zasad tłumaczenia EN→PL, czy głównie stylu i słownictwa biblijnego — wyniki (tabela, przykłady jakościowe) wskazują na silne dostosowanie do stylu treningu.
+
 ## Wyniki i prezentacja
 - **results/flan-t5-small/** — wyniki Flan-T5-small: `baseline/` (zero-shot) i `finetuned/` (checkpoint-3041) na Bible + OOD.
 - **results/Comparison.xlsx** — zestawienie BLEU/chrF (baseline vs fine-tuned).
 - **results/ResultPresentation.pptx** — prezentacja wyników projektu.
+- Tabela zbiorcza do slajdu: **[`results/slide_results_table.md`](results/slide_results_table.md)**.
 
 Szczegółowa checklista (stan projektu): **[`TODO.md`](TODO.md)**.
